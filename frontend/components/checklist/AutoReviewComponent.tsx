@@ -11,7 +11,9 @@ import { ChecklistPreviewTable } from './ChecklistPreviewTable';
 import { Play, Eye } from 'lucide-react';
 
 export function AutoReviewComponent() {
-  const { token } = useAppSelector((state) => state.auth);
+  const ksystemToken = useAppSelector(
+    (state) => state.auth.tokens.ksystem?.token,
+  );
   const [maxReviews, setMaxReviews] = useState<number>(10);
   const [projectName, setProjectName] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -25,8 +27,8 @@ export function AutoReviewComponent() {
   } | null>(null);
 
   const handleAutoReview = async () => {
-    if (!token) {
-      setError('Chưa đăng nhập');
+    if (!ksystemToken) {
+      setError('Chưa đăng nhập với Ksystem. Vui lòng đăng nhập bằng Microsoft SSO.');
       return;
     }
 
@@ -45,7 +47,7 @@ export function AutoReviewComponent() {
       setError(null);
       setSuccess(null);
 
-      const result = await checklistApi.autoReview(token, {
+      const result = await checklistApi.autoReview(ksystemToken, {
         maxReviews,
         projectName: projectName.trim(),
       });
@@ -61,8 +63,8 @@ export function AutoReviewComponent() {
   };
 
   const handlePreview = async () => {
-    if (!token) {
-      setError('Chưa đăng nhập');
+    if (!ksystemToken) {
+      setError('Chưa đăng nhập với Ksystem. Vui lòng đăng nhập bằng Microsoft SSO.');
       return;
     }
 

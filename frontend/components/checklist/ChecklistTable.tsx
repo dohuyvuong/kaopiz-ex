@@ -35,7 +35,9 @@ import { ExternalLink, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 
 export function ChecklistTable() {
-  const { token } = useAppSelector((state) => state.auth);
+  const ksystemToken = useAppSelector(
+    (state) => state.auth.tokens.ksystem?.token,
+  );
   const [reviews, setReviews] = useState<CodeReview[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,8 +47,8 @@ export function ChecklistTable() {
   const [perPage, setPerPage] = useState(10);
 
   const fetchReviews = async (page: number = 1, itemsPerPage: number = perPage) => {
-    if (!token) {
-      setError('Chưa đăng nhập');
+    if (!ksystemToken) {
+      setError('Chưa đăng nhập với Ksystem. Vui lòng đăng nhập bằng Microsoft SSO.');
       setLoading(false);
       return;
     }
@@ -54,7 +56,7 @@ export function ChecklistTable() {
     try {
       setLoading(true);
       setError(null);
-      const response = await checklistApi.getMyPendingReviews(token, {
+      const response = await checklistApi.getMyPendingReviews(ksystemToken, {
         page,
         perPage: itemsPerPage,
       });
@@ -71,7 +73,7 @@ export function ChecklistTable() {
 
   useEffect(() => {
     fetchReviews(1, perPage);
-  }, [token, perPage]);
+  }, [ksystemToken, perPage]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('vi-VN', {

@@ -64,9 +64,9 @@ export class ChecklistController {
     const result = await this.checklistService.getMyPendingReviews({
       sort: query.sort,
       page: query.page,
-      per_page: query.perPage, // Transform camelCase to snake_case for Kaopiz API
-      project_name: query.projectName, // Transform camelCase to snake_case for Kaopiz API
-      author_email: query.authorEmail, // Transform camelCase to snake_case for Kaopiz API
+      per_page: query.perPage, // Transform camelCase to snake_case for Ksystem API
+      project_name: query.projectName, // Transform camelCase to snake_case for Ksystem API
+      author_email: query.authorEmail, // Transform camelCase to snake_case for Ksystem API
     });
     return {
       success: true,

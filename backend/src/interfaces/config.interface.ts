@@ -1,5 +1,5 @@
 export interface AppConfig {
-  // Microsoft Entra ID (Azure AD)
+  // Microsoft Entra ID (Azure AD) - Cho Ksystem
   azureTenantId: string;
   azureClientId: string;
   azureClientSecret?: string;
@@ -8,7 +8,15 @@ export interface AppConfig {
   azureAuthority: string;
   azureTokenEndpoint: string;
 
-  // Kaopiz
-  kaopizSocialLoginEndpoint?: string;
-  kaopizApiBaseUrl: string;
+  // Ksystem API
+  ksystemSocialLoginEndpoint?: string;
+  ksystemApiBaseUrl: string;
+
+  // Ksystem OAuth - Cho HRM
+  ksystemOAuthBaseUrl?: string;
+  ksystemOAuthClientId?: string;
+  ksystemOAuthRedirectUri?: string;
+
+  // HRM API
+  hrmApiBaseUrl?: string;
 }

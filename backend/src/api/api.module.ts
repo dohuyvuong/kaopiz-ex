@@ -1,15 +1,17 @@
 import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
 import { ChecklistService } from './services/checklist.service';
-import { BaseKaopizService } from './services/base-kaopiz.service';
+import { KsystemService } from './services/ksystem.service';
+import { HRMService } from './services/hrm.service';
 import { AppConfigModule } from '../config/config.module';
 import { AppConfigService } from '../config/config.service';
 
 @Module({
   imports: [HttpModule, AppConfigModule],
   providers: [
-    BaseKaopizService,
+    KsystemService,
     ChecklistService,
+    HRMService,
     {
       provide: 'APP_CONFIG',
       useFactory: (configService: AppConfigService) =>
@@ -17,6 +19,6 @@ import { AppConfigService } from '../config/config.service';
       inject: [AppConfigService],
     },
   ],
-  exports: [BaseKaopizService, ChecklistService],
+  exports: [KsystemService, ChecklistService, HRMService],
 })
 export class ApiModule {}

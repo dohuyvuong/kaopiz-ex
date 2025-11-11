@@ -1,1 +1,1 @@
-export * from './kaopiz-api.dto';
+export * from './ksystem-api.dto';

@@ -3,16 +3,15 @@ import { HttpService } from '@nestjs/axios';
 import { AxiosRequestConfig } from 'axios';
 import { firstValueFrom } from 'rxjs';
 import { AppConfig } from '../../interfaces/config.interface';
-import { HttpMethod } from '../dto/kaopiz-api.dto';
+import { HttpMethod } from '../dto/ksystem-api.dto';
 import { AxiosError } from '../../common/types/error.types';
 
 /**
- * Base service cho các Kaopiz API services
- * Cung cấp các HTTP methods chung (GET, POST, PUT, PATCH, DELETE)
- * Token được truyền vào như tham số trong mỗi method
+ * Service để gọi Ksystem APIs
+ * Sử dụng token từ Microsoft SSO
  */
 @Injectable()
-export class BaseKaopizService {
+export class KsystemService {
   protected readonly logger: Logger;
   protected readonly baseURL: string;
 
@@ -20,12 +19,12 @@ export class BaseKaopizService {
     protected readonly httpService: HttpService,
     @Inject('APP_CONFIG') protected readonly config: AppConfig,
   ) {
-    this.logger = new Logger(BaseKaopizService.name);
-    this.baseURL = config.kaopizApiBaseUrl;
+    this.logger = new Logger(KsystemService.name);
+    this.baseURL = config.ksystemApiBaseUrl;
   }
 
   /**
-   * Validate token bằng cách gọi API lấy thông tin user
+   * Validate token bằng cách gọi API lấy thông tin user từ Ksystem
    * @param token - JWT token cần validate
    * @returns true nếu token hợp lệ, throw error nếu không hợp lệ
    */

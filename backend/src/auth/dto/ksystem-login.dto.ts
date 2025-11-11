@@ -1,9 +1,9 @@
-export interface KaopizLoginPayload {
+export interface KsystemLoginPayload {
   code: string;
   session_state?: string;
 }
 
-export interface KaopizLoginResponse {
+export interface KsystemLoginResponse {
   user: {
     id: number;
     name: string;

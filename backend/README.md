@@ -1,6 +1,6 @@
-# KaopizEX - Tự động hóa flow trên Kaopiz
+# KaopizEX - Backend
 
-KaopizEX để gọi APIs của Kaopiz với JWT Token từ Microsoft SSO.
+Hệ thống tích hợp để sử dụng (gọi API) của các hệ thống Kaopiz như Ksystem, HRM, và các hệ thống khác trong tương lai.
 
 **Built with NestJS and TypeScript**
 
@@ -8,8 +8,14 @@ KaopizEX để gọi APIs của Kaopiz với JWT Token từ Microsoft SSO.
 
 ```
 ┌─────────────┐         ┌─────────────┐         ┌─────────────┐
-│  KaopizEX   │ ──────> │   Kaopiz    │ <────── │  Microsoft  │
+│  KaopizEX   │ ──────> │   Ksystem   │ <────── │  Microsoft  │
 │             │  API    │             │  SSO    │     SSO     │
+│  (NestJS)   │ (JWT)   │  (APIs)     │         │             │
+└─────────────┘         └─────────────┘         └─────────────┘
+
+┌─────────────┐         ┌─────────────┐         ┌─────────────┐
+│  KaopizEX   │ ──────> │     HRM     │ <────── │   Ksystem   │
+│             │  API    │             │  OAuth  │   OAuth      │
 │  (NestJS)   │ (JWT)   │  (APIs)     │         │             │
 └─────────────┘         └─────────────┘         └─────────────┘
 ```
@@ -17,7 +23,7 @@ KaopizEX để gọi APIs của Kaopiz với JWT Token từ Microsoft SSO.
 ## Cài đặt
 
 ```bash
-npm install
+yarn install
 ```
 
 ## Cấu hình
@@ -29,92 +35,125 @@ cp .env.example .env
 
 2. Điền thông tin vào `.env` (xem chi tiết trong `ENV_SETUP.md`)
 
+## Authentication Providers
+
+Hệ thống hỗ trợ nhiều authentication providers:
+
+### 1. Microsoft SSO (cho Ksystem)
+- Provider name: `microsoft-sso`
+- System: `ksystem`
+- Flow: Microsoft SSO → Ksystem JWT Token
+
+### 2. Ksystem OAuth (cho HRM)
+- Provider name: `ksystem-oauth`
+- System: `hrm`
+- Flow: Ksystem OAuth → HRM JWT Token
+
+## API Endpoints
+
+### Authentication
+
+#### Lấy danh sách providers
+```bash
+GET /auth/providers
+```
+
+#### Lấy authorization URL cho provider
+```bash
+GET /auth/:provider/authorize
+# Ví dụ: GET /auth/microsoft-sso/authorize
+# Ví dụ: GET /auth/ksystem-oauth/authorize?redirectOAuth=optional_url
+```
+
+#### Exchange code thành token
+```bash
+POST /auth/:provider/token
+# Body: { "url": "..." } hoặc { "code": "...", "state": "..." }
+# Ví dụ: POST /auth/microsoft-sso/token
+# Ví dụ: POST /auth/ksystem-oauth/token
+```
+
+### Checklist (Ksystem APIs)
+
+Tất cả endpoints yêu cầu `Authorization: Bearer <token>` header với token từ Microsoft SSO.
+
+#### Lấy danh sách code reviews đang chờ review
+```bash
+GET /checklist/pending-reviews?projectName=...&page=1&perPage=20
+```
+
+#### Tự động review
+```bash
+POST /checklist/auto-review?maxReviews=10&projectName=...
+```
+
 ## Lấy JWT Token
 
-### Qua API Endpoints
+### Quy trình cho Microsoft SSO (Ksystem)
 
-**Quy trình:**
-1. Khởi động server: `npm run start:dev`
-2. Gọi `GET http://localhost:3000/auth/authorize` - Tự động mở browser để đăng nhập
-3. Sau khi đăng nhập, copy toàn bộ URL từ thanh địa chỉ
-4. Gọi `POST http://localhost:3000/auth/token` với body `{ "url": "..." }`
-5. Token được lưu vào cache tự động
+1. Khởi động server: `yarn start:dev`
+2. Gọi `GET http://localhost:8000/auth/microsoft-sso/authorize` - Lấy authorization URL
+3. Client tự mở URL trong browser để đăng nhập
+4. Sau khi đăng nhập, copy toàn bộ URL từ thanh địa chỉ
+5. Gọi `POST http://localhost:8000/auth/microsoft-sso/token` với body `{ "url": "..." }`
+6. Token được trả về cho client, client tự lưu (không lưu ở server)
 
 **Ví dụ:**
 ```bash
-# Bước 1: Lấy authorization URL (tự động mở browser)
-curl http://localhost:3000/auth/authorize
+# Bước 1: Lấy authorization URL
+curl http://localhost:8000/auth/microsoft-sso/authorize
+
+# Response:
+# {
+#   "success": true,
+#   "data": {
+#     "authUrl": "https://login.microsoftonline.com/...",
+#     "provider": "microsoft-sso",
+#     "system": "ksystem"
+#   }
+# }
 
 # Bước 2: Đổi code thành token
-curl -X POST http://localhost:3000/auth/token \
+curl -X POST http://localhost:8000/auth/microsoft-sso/token \
   -H "Content-Type: application/json" \
-  -d '{"url": "https://ksystem.kaopiz.com/auth/microsoft#code=...&session_state=..."}'
+  -d '{"url": "https://ksystem.kaopiz.com/auth/microsoft#code=0.ABC123...&session_state=xyz..."}'
 
-# Bước 3: Kiểm tra trạng thái token
-curl http://localhost:3000/auth/status
+# Response:
+# {
+#   "success": true,
+#   "data": {
+#     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+#     "system": "ksystem",
+#     "provider": "microsoft-sso"
+#   }
+# }
 ```
 
-**Lưu ý:**
-- Token được cache và tự động refresh khi hết hạn
+### Quy trình cho Ksystem OAuth (HRM)
 
-## Sử dụng
-
-### Basic Usage
-
-```typescript
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
-import { KaopizService } from './api/kaopiz.service';
-
-async function bootstrap() {
-  const app = await NestFactory.createApplicationContext(AppModule);
-  const kaopizService = app.get(KaopizService);
-
-  // Gọi API GET
-  const data = await kaopizService.get('/checklist');
-
-  // Gọi API POST
-  const result = await kaopizService.post('/checklist/review', {
-    checklistId: '123',
-    action: 'review'
-  });
-
-  await app.close();
-}
-
-bootstrap();
-```
-
-### Auto Flow
-
-```typescript
-const flowResult = await kaopizService.executeAutoFlow({
-  checklistId: '123',
-  action: 'review',
-  data: {
-    status: 'approved',
-    notes: 'Auto approved by KaopizEX'
-  }
-});
-```
+1. Gọi `GET http://localhost:8000/auth/ksystem-oauth/authorize` - Lấy authorization URL
+2. Client tự mở URL trong browser để đăng nhập
+3. Sau khi đăng nhập, copy toàn bộ URL từ thanh địa chỉ
+4. Gọi `POST http://localhost:8000/auth/ksystem-oauth/token` với body `{ "url": "..." }`
+5. Token được trả về cho client
 
 ## Chạy
 
 ```bash
+# Development mode (auto-reload)
+yarn start:dev
+
 # Build project
-npm run build
+yarn build
 
 # Chạy ứng dụng (production)
-npm run start:prod
-
-# Development mode (auto-reload)
-npm run start:dev
+yarn start:prod
 
 # Lint code
-npm run lint
+yarn lint
 
 # Format code
-npm run format
+yarn format
 ```
 
 ## Cấu trúc Project
@@ -122,51 +161,70 @@ npm run format
 ```
 src/
 ├── main.ts                 # Entry point
-├── app.module.ts          # Root module
-├── config/                # Configuration
+├── app.module.ts           # Root module
+├── config/                 # Configuration
 │   ├── config.module.ts
 │   └── config.service.ts
-├── auth/                  # Authentication
+├── auth/                   # Authentication
 │   ├── auth.module.ts
-│   └── token.service.ts
-├── api/                   # API services
+│   ├── auth.controller.ts
+│   ├── providers/          # Authentication providers
+│   │   ├── microsoft-sso.provider.ts
+│   │   └── ksystem-oauth.provider.ts
+│   ├── services/           # Auth services
+│   │   ├── auth.service.ts
+│   │   └── token-store.service.ts
+│   ├── guards/             # Auth guards
+│   │   ├── jwt-auth.guard.ts
+│   │   └── jwt-auth-system.guard.ts
+│   └── decorators/         # Custom decorators
+│       ├── auth.decorator.ts
+│       └── system.decorator.ts
+├── api/                    # API services
 │   ├── api.module.ts
-│   └── kaopiz.service.ts
-├── interfaces/            # TypeScript interfaces
+│   └── services/
+│       ├── ksystem.service.ts
+│       ├── hrm.service.ts
+│       └── checklist.service.ts
+├── checklist/              # Checklist module
+│   ├── checklist.controller.ts
+│   └── checklist-auto-review.service.ts
+├── interfaces/             # TypeScript interfaces
 │   ├── config.interface.ts
 │   └── token.interface.ts
-└── utils/                 # Utilities
+└── utils/                  # Utilities
     └── extract-auth-params.util.ts
 ```
 
 ## Token Management
 
-- Token được lưu tự động vào `.token-cache.json`
-- Tự động refresh khi hết hạn (nếu có refresh_token)
-- Token cache được sử dụng cho các lần gọi API tiếp theo
+- Token không được lưu ở server
+- Client phải gửi kèm token trong header `Authorization: Bearer <token>` cho mỗi request
+- Token được validate bằng cách gọi API của hệ thống tương ứng
 
 ## Lưu ý
 
-1. **Bảo mật**: Không commit file `.env` và `.token-cache.json` vào git
-2. **Token Management**: Token được cache tự động, refresh khi cần
-3. **Error Handling**: Xử lý lỗi authentication và API errors
+1. **Bảo mật**: Không commit file `.env` vào git
+2. **Token Management**: Token được quản lý bởi client, không lưu ở server
+3. **Multi-Provider**: Hệ thống hỗ trợ nhiều providers, mỗi provider cho một hệ thống khác nhau
+4. **Error Handling**: Xử lý lỗi authentication và API errors
 
 ## Troubleshooting
 
-### Lỗi: "Không có token"
+### Lỗi: "Provider 'xxx' không tồn tại"
 
 **Giải pháp:**
-1. Gọi `GET /auth/authorize` để lấy token từ SSO
-2. Kiểm tra file `.token-cache.json` có tồn tại và hợp lệ không
+- Kiểm tra provider name có đúng không (ví dụ: `microsoft-sso`, `ksystem-oauth`)
+- Xem danh sách providers: `GET /auth/providers`
 
-### Lỗi: "API Error: 401"
+### Lỗi: "Token không hợp lệ hoặc đã hết hạn"
 
 **Giải pháp:**
-- Token đã hết hạn, gọi lại `GET /auth/authorize` để lấy token mới
-- Kiểm tra token có đúng format không
+- Token đã hết hạn, cần lấy token mới
+- Đảm bảo đang dùng đúng token cho đúng hệ thống (ksystem token cho Ksystem APIs, hrm token cho HRM APIs)
 
 ### Lỗi: "Không tìm thấy authorization code trong URL"
 
 **Giải pháp:**
-- Đảm bảo copy toàn bộ URL từ browser (bao gồm cả `#code=...`)
-- URL phải có format: `https://ksystem.kaopiz.com/auth/microsoft#code=...&session_state=...`
+- Đảm bảo copy toàn bộ URL từ browser (bao gồm cả `#code=...` hoặc `?code=...`)
+- URL phải có format đúng với provider tương ứng

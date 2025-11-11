@@ -6,13 +6,13 @@ import {
   Logger,
 } from '@nestjs/common';
 import { AuthenticatedRequest } from '../../common/types/request.types';
-import { BaseKaopizService } from '../../api/services/base-kaopiz.service';
+import { KsystemService } from '../../api/services/ksystem.service';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   private readonly logger = new Logger(JwtAuthGuard.name);
 
-  constructor(private readonly baseKaopizService: BaseKaopizService) {}
+  constructor(private readonly ksystemService: KsystemService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
@@ -45,9 +45,9 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('Token không đúng định dạng JWT');
     }
 
-    // Validate token bằng cách gọi API Kaopiz
+    // Validate token bằng cách gọi API Ksystem
     try {
-      await this.baseKaopizService.validateToken(token);
+      await this.ksystemService.validateToken(token);
       this.logger.log('Token đã được validate thành công');
     } catch (error) {
       const errorMessage =

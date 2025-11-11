@@ -9,4 +9,5 @@ export interface TokenData {
 export interface AuthParams {
   code: string | null;
   sessionState: string | null;
+  state: string | null;
 }

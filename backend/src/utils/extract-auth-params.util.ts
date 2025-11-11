@@ -1,16 +1,17 @@
 import { AuthParams } from '../interfaces/token.interface';
 
 /**
- * Utility để extract code và session_state từ callback URL
+ * Utility để extract code, session_state và state từ callback URL
  */
 export function extractAuthParams(input: string): AuthParams {
   if (!input || !input.trim()) {
-    return { code: null, sessionState: null };
+    return { code: null, sessionState: null, state: null };
   }
 
   const trimmed = input.trim();
   let code: string | null = null;
   let sessionState: string | null = null;
+  let state: string | null = null;
 
   // Nếu là URL đầy đủ
   if (trimmed.includes('code=')) {
@@ -20,6 +21,7 @@ export function extractAuthParams(input: string): AuthParams {
       const params = new URLSearchParams(hashPart);
       code = params.get('code');
       sessionState = params.get('session_state');
+      state = params.get('state');
     }
     // Extract từ query string (?code=...)
     else if (trimmed.includes('?code=')) {
@@ -27,20 +29,25 @@ export function extractAuthParams(input: string): AuthParams {
         const urlObj = new URL(trimmed);
         code = urlObj.searchParams.get('code');
         sessionState = urlObj.searchParams.get('session_state');
+        state = urlObj.searchParams.get('state');
       } catch {
         // Fallback: manual parsing
         const codeMatch = trimmed.match(/code=([^&]+)/);
         const sessionMatch = trimmed.match(/session_state=([^&]+)/);
+        const stateMatch = trimmed.match(/state=([^&]+)/);
         if (codeMatch) code = codeMatch[1];
         if (sessionMatch) sessionState = sessionMatch[1];
+        if (stateMatch) state = stateMatch[1];
       }
     }
     // Fallback: manual parsing
     else {
       const codeMatch = trimmed.match(/code=([^&]+)/);
       const sessionMatch = trimmed.match(/session_state=([^&]+)/);
+      const stateMatch = trimmed.match(/state=([^&]+)/);
       if (codeMatch) code = codeMatch[1];
       if (sessionMatch) sessionState = sessionMatch[1];
+      if (stateMatch) state = stateMatch[1];
     }
   }
   // Nếu chỉ là code (không phải URL)
@@ -48,5 +55,5 @@ export function extractAuthParams(input: string): AuthParams {
     code = trimmed;
   }
 
-  return { code, sessionState };
+  return { code, sessionState, state };
 }

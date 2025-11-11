@@ -1,7 +1,7 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { REQUEST } from '@nestjs/core';
 import { AuthenticatedRequest } from '../../common/types/request.types';
-import { BaseKaopizService } from './base-kaopiz.service';
+import { KsystemService } from './ksystem.service';
 
 // Code Review interfaces
 export interface CodeReviewReviewer {
@@ -239,7 +239,7 @@ export interface SubmitReviewPayload {
 @Injectable()
 export class ChecklistService {
   constructor(
-    private readonly baseKaopizService: BaseKaopizService,
+    private readonly ksystemService: KsystemService,
     @Inject(REQUEST) private readonly request: AuthenticatedRequest,
   ) {}
 
@@ -283,7 +283,7 @@ export class ChecklistService {
     }
 
     const endpoint = `/code-reviews?${queryParams.toString()}`;
-    return this.baseKaopizService.get<CodeReviewListResponse>(
+    return this.ksystemService.get<CodeReviewListResponse>(
       endpoint,
       this.getToken(),
     );
@@ -310,7 +310,7 @@ export class ChecklistService {
     }
 
     const endpoint = `/code-reviews${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-    return this.baseKaopizService.get<CodeReviewListResponse>(
+    return this.ksystemService.get<CodeReviewListResponse>(
       endpoint,
       this.getToken(),
     );
@@ -325,7 +325,7 @@ export class ChecklistService {
     queryParams.append('detail', 'true');
 
     const endpoint = `/code-reviews/${id}?${queryParams.toString()}`;
-    return this.baseKaopizService.get<CodeReviewDetailResponse>(
+    return this.ksystemService.get<CodeReviewDetailResponse>(
       endpoint,
       this.getToken(),
     );
@@ -350,7 +350,7 @@ export class ChecklistService {
     }
 
     const endpoint = `/code-reviews/${id}/review${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-    return this.baseKaopizService.get<CodeReviewItemWithChecklist[]>(
+    return this.ksystemService.get<CodeReviewItemWithChecklist[]>(
       endpoint,
       this.getToken(),
     );
@@ -366,7 +366,7 @@ export class ChecklistService {
     payload: SubmitReviewPayload,
   ): Promise<boolean> {
     const endpoint = `/code-reviews/${id}/review`;
-    return this.baseKaopizService.post<boolean>(
+    return this.ksystemService.post<boolean>(
       endpoint,
       this.getToken(),
       payload,

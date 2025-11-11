@@ -1,9 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Card,
   CardContent,
@@ -11,23 +19,78 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { authApi } from '@/lib/api/auth';
-import { useAppDispatch } from '@/lib/hooks';
+import { authApi, type Provider } from '@/lib/api/auth';
+import { useAppDispatch, useAppSelector } from '@/lib/hooks';
 import { setToken, setLoading } from '@/lib/features/auth/authSlice';
+import { SYSTEMS } from '@/lib/types/system';
 
 export default function LoginPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const { tokens } = useAppSelector((state) => state.auth);
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [selectedProvider, setSelectedProvider] = useState<string>('');
   const [authUrl, setAuthUrl] = useState<string>('');
   const [callbackUrl, setCallbackUrl] = useState<string>('');
+  const [redirectOAuth, setRedirectOAuth] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>('');
 
+  // Lấy error từ URL query params (nếu có)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const errorParam = params.get('error');
+      if (errorParam) {
+        setError(decodeURIComponent(errorParam));
+      }
+    }
+  }, []);
+
+  // Load providers khi component mount
+  useEffect(() => {
+    const loadProviders = async () => {
+      try {
+        const providersList = await authApi.getProviders();
+        setProviders(providersList);
+        // Mặc định chọn provider đầu tiên
+        if (providersList.length > 0) {
+          setSelectedProvider(providersList[0].name);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load providers');
+      }
+    };
+    loadProviders();
+  }, []);
+
+  // Set redirectOAuth mặc định cho Ksystem OAuth
+  useEffect(() => {
+    if (selectedProvider === 'ksystem-oauth') {
+      setRedirectOAuth(
+        typeof window !== 'undefined'
+          ? `${window.location.origin}/auth/callback`
+          : '',
+      );
+    } else {
+      setRedirectOAuth('');
+    }
+  }, [selectedProvider]);
+
   const handleGetAuthUrl = async () => {
+    if (!selectedProvider) {
+      setError('Vui lòng chọn provider');
+      return;
+    }
+
     try {
       setIsLoading(true);
       setError('');
-      const response = await authApi.getAuthorizationUrl();
+      const params =
+        selectedProvider === 'ksystem-oauth' && redirectOAuth
+          ? { redirectOAuth }
+          : undefined;
+      const response = await authApi.getAuthorizationUrl(selectedProvider, params);
       setAuthUrl(response.authUrl);
 
       // Tự động mở URL trong tab mới
@@ -45,13 +108,30 @@ export default function LoginPage() {
       return;
     }
 
+    if (!selectedProvider) {
+      setError('Vui lòng chọn provider');
+      return;
+    }
+
     try {
       setIsLoading(true);
       setError('');
       dispatch(setLoading(true));
 
-      const response = await authApi.exchangeToken({ url: callbackUrl });
-      dispatch(setToken(response.token));
+      const response = await authApi.exchangeToken(selectedProvider, {
+        url: callbackUrl,
+      });
+
+      // Lưu token với system và provider info
+      dispatch(
+        setToken({
+          token: response.token,
+          system: response.system || 'ksystem',
+          provider: response.provider || selectedProvider,
+          userInfo: response.userInfo,
+          expiresAt: response.expiresAt,
+        }),
+      );
 
       // Redirect về dashboard
       router.push('/dashboard');
@@ -63,13 +143,15 @@ export default function LoginPage() {
     }
   };
 
+  const selectedProviderInfo = providers.find((p) => p.name === selectedProvider);
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Đăng nhập</CardTitle>
           <CardDescription>
-            Đăng nhập bằng Microsoft SSO để tiếp tục
+            Chọn hệ thống và đăng nhập để tiếp tục
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -79,25 +161,109 @@ export default function LoginPage() {
             </div>
           )}
 
+          {/* Hiển thị trạng thái đăng nhập */}
+          {Object.keys(tokens).length > 0 && (
+            <div className="p-3 text-sm bg-green-50 border border-green-200 rounded-md">
+              <p className="font-medium text-green-800">Đã đăng nhập:</p>
+              <ul className="mt-1 space-y-1">
+                {Object.values(tokens).map((tokenInfo) => {
+                  const systemInfo =
+                    tokenInfo.system === 'ksystem'
+                      ? SYSTEMS.KSYSTEM
+                      : tokenInfo.system === 'hrm'
+                        ? SYSTEMS.HRM
+                        : null;
+                  return (
+                    <li key={tokenInfo.system} className="text-green-700">
+                      • {systemInfo?.displayName || tokenInfo.system} (
+                      {tokenInfo.provider})
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+
+          {/* Chọn Provider */}
+          <div className="space-y-2">
+            <Label htmlFor="provider">Chọn hệ thống</Label>
+            <Select
+              value={selectedProvider}
+              onValueChange={setSelectedProvider}
+              disabled={isLoading}
+            >
+              <SelectTrigger id="provider">
+                <SelectValue placeholder="Chọn hệ thống..." />
+              </SelectTrigger>
+              <SelectContent>
+                {providers.map((provider) => {
+                  const systemInfo =
+                    provider.system === 'ksystem'
+                      ? SYSTEMS.KSYSTEM
+                      : provider.system === 'hrm'
+                        ? SYSTEMS.HRM
+                        : null;
+                  return (
+                    <SelectItem key={provider.name} value={provider.name}>
+                      {systemInfo?.description ||
+                        `${provider.system} (${provider.name})`}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+            {selectedProviderInfo && (
+              <p className="text-xs text-gray-500">
+                Hệ thống:{' '}
+                {selectedProviderInfo.system === 'ksystem'
+                  ? SYSTEMS.KSYSTEM.displayName
+                  : selectedProviderInfo.system === 'hrm'
+                    ? SYSTEMS.HRM.displayName
+                    : selectedProviderInfo.system}{' '}
+                | Provider: {selectedProviderInfo.name}
+              </p>
+            )}
+          </div>
+
+          {/* Redirect OAuth cho Ksystem OAuth */}
+          {selectedProvider === 'ksystem-oauth' && (
+            <div className="space-y-2">
+              <Label htmlFor="redirect-oauth">
+                Redirect OAuth (URL để nhận code sau khi đăng nhập)
+              </Label>
+              <Input
+                id="redirect-oauth"
+                type="text"
+                placeholder="http://localhost:3000/auth/callback"
+                value={redirectOAuth}
+                onChange={(e) => setRedirectOAuth(e.target.value)}
+                disabled={isLoading}
+              />
+              <p className="text-xs text-gray-500">
+                URL này sẽ được dùng để redirect sau khi đăng nhập thành công.
+                Code sẽ có trong query string của URL này.
+              </p>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Button
               onClick={handleGetAuthUrl}
-              disabled={isLoading}
+              disabled={isLoading || !selectedProvider}
               className="w-full"
             >
               {authUrl ? 'Lấy lại URL đăng nhập' : 'Lấy URL đăng nhập'}
             </Button>
             {authUrl && (
               <p className="text-xs text-gray-500">
-                URL đã được mở trong tab mới. Vui lòng đăng nhập và copy URL callback.
+                URL đã được mở trong tab mới. Vui lòng đăng nhập và copy URL
+                callback.
               </p>
             )}
           </div>
 
           <div className="space-y-2">
-            <label htmlFor="callback-url" className="text-sm font-medium">
-              URL Callback (sau khi đăng nhập)
-            </label>
+            <Label htmlFor="callback-url">URL Callback (sau khi đăng nhập)</Label>
             <Input
               id="callback-url"
               type="text"
@@ -108,7 +274,7 @@ export default function LoginPage() {
             />
             <Button
               onClick={handleExchangeToken}
-              disabled={isLoading || !callbackUrl.trim()}
+              disabled={isLoading || !callbackUrl.trim() || !selectedProvider}
               className="w-full"
             >
               {isLoading ? 'Đang xử lý...' : 'Xác nhận và lấy token'}

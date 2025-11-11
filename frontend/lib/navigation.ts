@@ -1,14 +1,19 @@
 import { type LucideIcon, LayoutDashboard, CheckSquare, Play, Clock } from "lucide-react"
+import { type System, SYSTEMS } from "./types/system"
+
+export type SystemRequirement = System
 
 export interface NavItem {
   title: string
   url: string
   icon: LucideIcon
+  system?: SystemRequirement // System requirement cho route này
 }
 
 export interface NavItemWithSubmenu {
   title: string
   icon: LucideIcon
+  system?: SystemRequirement // System requirement cho submenu này
   items: NavItem[]
 }
 
@@ -19,20 +24,24 @@ export const navItems: NavItemType[] = [
     title: "Dashboard",
     url: "/dashboard",
     icon: LayoutDashboard,
+    // Không có system requirement - public route
   },
   {
     title: "Checklist Review",
     icon: CheckSquare,
+    system: SYSTEMS.KSYSTEM, // Cần ksystem token
     items: [
       {
         title: "Chờ tôi duyệt",
         url: "/checklist-review/pending",
         icon: Clock,
+        system: SYSTEMS.KSYSTEM,
       },
       {
         title: "Tự động review",
         url: "/checklist-review/auto-review",
         icon: Play,
+        system: SYSTEMS.KSYSTEM,
       },
     ],
   },
@@ -125,4 +134,26 @@ export function findNavItemByPathname(
   }
 
   return null
+}
+
+/**
+ * Lấy system requirement cho một pathname
+ * Trả về undefined nếu route không yêu cầu system cụ thể (public route)
+ */
+export function getSystemRequirementForPathname(
+  pathname: string,
+  items: NavItemType[] = navItems
+): System | undefined {
+  const result = findNavItemByPathname(pathname, items)
+  if (result) {
+    if (result.item.system) {
+      return result.item.system
+    }
+    if (result.parent && result.parent.system) {
+      return result.parent.system
+    }
+  }
+
+  // Không có system requirement - public route
+  return undefined
 }

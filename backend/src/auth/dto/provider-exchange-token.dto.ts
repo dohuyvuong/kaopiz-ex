@@ -1,6 +1,6 @@
 import { IsOptional, IsString } from 'class-validator';
 
-export class ExchangeTokenDto {
+export class ProviderExchangeTokenDto {
   @IsOptional()
   @IsString()
   url?: string;
@@ -8,6 +8,10 @@ export class ExchangeTokenDto {
   @IsOptional()
   @IsString()
   code?: string;
+
+  @IsOptional()
+  @IsString()
+  state?: string;
 
   @IsOptional()
   @IsString()

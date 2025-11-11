@@ -1,14 +1,24 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { SystemName } from '@/lib/types/system';
+
+export interface TokenInfo {
+  token: string;
+  system: SystemName;
+  provider: string;
+  userInfo?: unknown;
+  expiresAt?: number;
+}
 
 interface AuthState {
-  token: string | null;
-  isAuthenticated: boolean;
+  tokens: {
+    ksystem?: TokenInfo;
+    hrm?: TokenInfo;
+  };
   isLoading: boolean;
 }
 
 const initialState: AuthState = {
-  token: null,
-  isAuthenticated: false,
+  tokens: {},
   isLoading: false,
 };
 
@@ -16,13 +26,33 @@ const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    setToken: (state, action: PayloadAction<string>) => {
-      state.token = action.payload;
-      state.isAuthenticated = true;
+    setToken: (
+      state,
+      action: PayloadAction<{
+        token: string;
+        system: SystemName;
+        provider: string;
+        userInfo?: unknown;
+        expiresAt?: number;
+      }>,
+    ) => {
+      const { token, system, provider, userInfo, expiresAt } = action.payload;
+      state.tokens[system as keyof typeof state.tokens] = {
+        token,
+        system,
+        provider,
+        userInfo,
+        expiresAt,
+      };
     },
-    clearToken: (state) => {
-      state.token = null;
-      state.isAuthenticated = false;
+    clearToken: (state, action: PayloadAction<SystemName | undefined>) => {
+      if (action.payload) {
+        // Xóa token của system cụ thể
+        delete state.tokens[action.payload as keyof typeof state.tokens];
+      } else {
+        // Xóa tất cả tokens
+        state.tokens = {};
+      }
     },
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.isLoading = action.payload;

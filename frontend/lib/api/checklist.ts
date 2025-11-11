@@ -59,6 +59,7 @@ export interface GetCodeReviewsParams {
 export const checklistApi = {
   /**
    * Lấy danh sách code reviews đang chờ tôi review
+   * Yêu cầu token từ Ksystem (microsoft-sso)
    */
   async getMyPendingReviews(
     token: string,
@@ -114,6 +115,7 @@ export const checklistApi = {
 
   /**
    * Tự động review các checklist
+   * Yêu cầu token từ Ksystem (microsoft-sso)
    */
   async autoReview(
     token: string,

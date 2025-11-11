@@ -25,7 +25,9 @@ export function ChecklistPreviewTable({
   maxReviews,
   projectName,
 }: ChecklistPreviewTableProps) {
-  const { token } = useAppSelector((state) => state.auth);
+  const ksystemToken = useAppSelector(
+    (state) => state.auth.tokens.ksystem?.token,
+  );
   const [reviews, setReviews] = useState<CodeReview[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,8 +35,8 @@ export function ChecklistPreviewTable({
 
   useEffect(() => {
     const fetchPreview = async () => {
-      if (!token) {
-        setError('Chưa đăng nhập');
+      if (!ksystemToken) {
+        setError('Chưa đăng nhập với Ksystem. Vui lòng đăng nhập bằng Microsoft SSO.');
         setLoading(false);
         return;
       }
@@ -42,7 +44,7 @@ export function ChecklistPreviewTable({
       try {
         setLoading(true);
         setError(null);
-        const response = await checklistApi.getMyPendingReviews(token, {
+        const response = await checklistApi.getMyPendingReviews(ksystemToken, {
           projectName,
           perPage: maxReviews,
           page: 1,
@@ -59,7 +61,7 @@ export function ChecklistPreviewTable({
     };
 
     fetchPreview();
-  }, [token, maxReviews, projectName]);
+  }, [ksystemToken, maxReviews, projectName]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('vi-VN', {
