@@ -67,7 +67,9 @@ export function NavMain() {
     <SidebarGroup>
       <SidebarGroupLabel>Menu</SidebarGroupLabel>
       <SidebarMenu>
-        {navItems.map((item) => {
+        {navItems
+          .filter((item) => item.showInSidebar !== false) // Chỉ hiển thị items có showInSidebar !== false
+          .map((item) => {
           // Check if item has submenu
           if ("items" in item) {
             const isOpen = openSubmenus.has(item.title)

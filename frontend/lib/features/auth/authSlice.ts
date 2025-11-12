@@ -1,11 +1,12 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { SystemName } from '@/lib/types/system';
+import { CommonUserInfo, HrmUserInfoResponse } from '@/lib/types/userInfo';
 
 export interface TokenInfo {
   token: string;
   system: SystemName;
   provider: string;
-  userInfo?: unknown;
+  userInfo?: CommonUserInfo | HrmUserInfoResponse;
   expiresAt?: number;
 }
 
@@ -32,7 +33,7 @@ const authSlice = createSlice({
         token: string;
         system: SystemName;
         provider: string;
-        userInfo?: unknown;
+        userInfo?: CommonUserInfo | HrmUserInfoResponse;
         expiresAt?: number;
       }>,
     ) => {

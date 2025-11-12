@@ -1,4 +1,4 @@
-import { type LucideIcon, LayoutDashboard, CheckSquare, Play, Clock } from "lucide-react"
+import { type LucideIcon, LayoutDashboard, CheckSquare, Play, Clock, User } from "lucide-react"
 import { type System, SYSTEMS } from "./types/system"
 
 export type SystemRequirement = System
@@ -8,6 +8,7 @@ export interface NavItem {
   url: string
   icon: LucideIcon
   system?: SystemRequirement // System requirement cho route này
+  showInSidebar?: boolean // Mặc định true, set false để ẩn khỏi sidebar nhưng vẫn dùng cho breadcrumb
 }
 
 export interface NavItemWithSubmenu {
@@ -15,6 +16,7 @@ export interface NavItemWithSubmenu {
   icon: LucideIcon
   system?: SystemRequirement // System requirement cho submenu này
   items: NavItem[]
+  showInSidebar?: boolean // Mặc định true, set false để ẩn khỏi sidebar nhưng vẫn dùng cho breadcrumb
 }
 
 export type NavItemType = NavItem | NavItemWithSubmenu
@@ -44,6 +46,12 @@ export const navItems: NavItemType[] = [
         system: SYSTEMS.KSYSTEM,
       },
     ],
+  },
+  {
+    title: "Tài khoản",
+    url: "/account",
+    icon: User,
+    showInSidebar: false, // Ẩn khỏi sidebar nhưng vẫn dùng cho breadcrumb
   },
 ]
 

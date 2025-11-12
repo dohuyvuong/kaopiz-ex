@@ -1,4 +1,5 @@
 import { SystemName } from '@/lib/types/system';
+import { CommonUserInfo, HrmUserInfoResponse } from '@/lib/types/userInfo';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
 
@@ -20,7 +21,7 @@ export interface ExchangeTokenResponse {
   token: string;
   system?: SystemName;
   provider?: string;
-  userInfo?: unknown;
+  userInfo?: CommonUserInfo | HrmUserInfoResponse;
   expiresAt?: number;
   note: string;
 }

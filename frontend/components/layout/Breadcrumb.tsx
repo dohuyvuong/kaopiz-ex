@@ -35,7 +35,7 @@ export function AppBreadcrumb() {
       icon: <Home className="h-4 w-4" />,
     });
 
-    // Tìm menu item từ pathname
+    // Tìm menu item từ pathname (bao gồm cả items có showInSidebar: false)
     const navResult = findNavItemByPathname(pathname);
 
     if (navResult) {

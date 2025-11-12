@@ -208,34 +208,41 @@ export function ChecklistTable() {
               </div>
 
               {/* Pagination */}
-              <div className="flex items-center justify-between mt-4">
-                <div className="text-sm text-muted-foreground">
-                  Hiển thị {((currentPage - 1) * perPage) + 1} - {Math.min(currentPage * perPage, total)} trong tổng số {total} items
+              <div className="flex flex-col xl:flex-row justify-center mt-4 gap-4">
+                <div className="flex flex-1 justify-between items-center">
+                  <div className="text-sm text-muted-foreground">
+                    <span className="hidden sm:inline">
+                      Hiển thị {((currentPage - 1) * perPage) + 1} - {Math.min(currentPage * perPage, total)} trong tổng số {total} items
+                    </span>
+                    <span className="sm:hidden">
+                      {((currentPage - 1) * perPage) + 1}-{Math.min(currentPage * perPage, total)} / {total}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 whitespace-nowrap">
+                    <span className="text-sm text-muted-foreground">Rows per page:</span>
+                    <Select
+                      value={String(perPage)}
+                      onValueChange={(value) => {
+                        const newPerPage = Number(value);
+                        setPerPage(newPerPage);
+                        setCurrentPage(1); // Reset về trang đầu khi thay đổi perPage
+                        fetchReviews(1, newPerPage);
+                      }}
+                    >
+                      <SelectTrigger className="w-[70px] h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="20">20</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                        <SelectItem value="100">100</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 {totalPages > 1 && (
                   <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2 whitespace-nowrap">
-                      <span className="text-sm text-muted-foreground">Rows per page:</span>
-                      <Select
-                        value={String(perPage)}
-                        onValueChange={(value) => {
-                          const newPerPage = Number(value);
-                          setPerPage(newPerPage);
-                          setCurrentPage(1); // Reset về trang đầu khi thay đổi perPage
-                          fetchReviews(1, newPerPage);
-                        }}
-                      >
-                        <SelectTrigger className="w-[70px] h-8">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="10">10</SelectItem>
-                          <SelectItem value="20">20</SelectItem>
-                          <SelectItem value="50">50</SelectItem>
-                          <SelectItem value="100">100</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
                     <Pagination>
                         <PaginationContent>
                         <PaginationItem>
