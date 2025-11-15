@@ -3,7 +3,7 @@ import { AuthenticatedRequest } from '../../common/types/request.types';
 
 /**
  * Decorator để extract JWT token từ request
- * Token đã được validate và lưu vào request bởi JwtAuthGuard
+ * Token đã được validate và lưu vào request bởi JwtAuthSystemGuard
  *
  * Sử dụng trong controller:
  * @Get()
@@ -11,7 +11,7 @@ import { AuthenticatedRequest } from '../../common/types/request.types';
  *   // token đã được validate bởi Guard
  * }
  *
- * Lưu ý: Decorator này chỉ hoạt động khi request đã đi qua JwtAuthGuard
+ * Lưu ý: Decorator này chỉ hoạt động khi request đã đi qua JwtAuthSystemGuard
  */
 export const Token = createParamDecorator(
   (data: unknown, ctx: ExecutionContext): string => {

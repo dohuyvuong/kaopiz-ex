@@ -1,4 +1,4 @@
-import { type LucideIcon, LayoutDashboard, CheckSquare, Play, Clock, User } from "lucide-react"
+import { type LucideIcon, LayoutDashboard, CheckSquare, Play, Clock, User, Calendar } from "lucide-react"
 import { type System, SYSTEMS } from "./types/system"
 
 export type SystemRequirement = System
@@ -46,6 +46,12 @@ export const navItems: NavItemType[] = [
         system: SYSTEMS.KSYSTEM,
       },
     ],
+  },
+  {
+    title: "Chấm công",
+    url: "/timesheet",
+    icon: Calendar,
+    system: SYSTEMS.HRM, // Cần HRM token
   },
   {
     title: "Tài khoản",

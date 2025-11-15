@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
 import { AuthController } from './auth.controller';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { JwtAuthSystemGuard } from './guards/jwt-auth-system.guard';
 import { AppConfigModule } from '../config/config.module';
 import { AppConfigService } from '../config/config.service';
@@ -20,7 +19,6 @@ import { ApiModule } from '../api/api.module';
     // Services
     AuthService,
     // Guards
-    JwtAuthGuard,
     JwtAuthSystemGuard,
     // Config
     {
@@ -30,6 +28,6 @@ import { ApiModule } from '../api/api.module';
       inject: [AppConfigService],
     },
   ],
-  exports: [AuthService, JwtAuthGuard, JwtAuthSystemGuard],
+  exports: [AuthService, JwtAuthSystemGuard],
 })
 export class AuthModule {}

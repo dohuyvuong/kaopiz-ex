@@ -7,13 +7,13 @@ import {
   ParseIntPipe,
 } from '@nestjs/common';
 import { ChecklistAutoReviewService } from './checklist-auto-review.service';
-import { ChecklistService } from '../api/services/checklist.service';
+import { ChecklistService } from './checklist.service';
 import { AutoReviewQueryDto } from './dto/auto-review.dto';
 import { GetPendingReviewsQueryDto } from './dto/get-pending-reviews.dto';
 import { Auth } from '../auth/decorators';
 
 @Controller('checklist')
-@Auth()
+@Auth('ksystem')
 export class ChecklistController {
   constructor(
     private readonly autoReviewService: ChecklistAutoReviewService,
@@ -64,9 +64,9 @@ export class ChecklistController {
     const result = await this.checklistService.getMyPendingReviews({
       sort: query.sort,
       page: query.page,
-      per_page: query.perPage, // Transform camelCase to snake_case for Ksystem API
-      project_name: query.projectName, // Transform camelCase to snake_case for Ksystem API
-      author_email: query.authorEmail, // Transform camelCase to snake_case for Ksystem API
+      perPage: query.perPage,
+      projectName: query.projectName,
+      authorEmail: query.authorEmail,
     });
     return {
       success: true,

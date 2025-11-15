@@ -20,17 +20,6 @@ async function bootstrap() {
     console.log('🚀 KaopizEX đã khởi động thành công!');
     console.log(`📡 API Server đang chạy tại: http://localhost:${port}`);
     console.log(`🌐 CORS enabled cho: ${corsOrigin}`);
-    console.log('\n📋 Các API endpoints:');
-    console.log(
-      `   GET  http://localhost:${port}/auth/authorize  - Lấy authorization URL`,
-    );
-    console.log(
-      `   POST http://localhost:${port}/auth/token     - Đổi authorization code thành token`,
-    );
-    console.log(
-      `   POST http://localhost:${port}/checklist/auto-review - Tự động review checklist (yêu cầu auth)`,
-    );
-    console.log('\n⏳ Đang chờ requests... (Nhấn Ctrl+C để thoát)');
 
     // Xử lý graceful shutdown
     process.on('SIGINT', async () => {

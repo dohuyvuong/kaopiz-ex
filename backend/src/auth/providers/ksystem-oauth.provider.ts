@@ -57,8 +57,8 @@ export class KsystemOAuthProvider implements AuthProvider {
       // Gọi HRM API callback endpoint để exchange code thành token
       // HRM API sẽ tự xử lý với Ksystem OAuth và trả về token
       const hrmApiBaseUrl =
-        this.config.hrmApiBaseUrl || 'https://api.hrm.kaopiz.com';
-      let callbackUrl = `${hrmApiBaseUrl}/api/auth/callback?code=${encodeURIComponent(code)}`;
+        this.config.hrmApiBaseUrl || 'https://api.hrm.kaopiz.com/api';
+      let callbackUrl = `${hrmApiBaseUrl}/auth/callback?code=${encodeURIComponent(code)}`;
 
       if (state) {
         callbackUrl += `&state=${encodeURIComponent(state)}`;
@@ -111,9 +111,9 @@ export class KsystemOAuthProvider implements AuthProvider {
   async validateToken(token: string): Promise<boolean> {
     try {
       const hrmApiBaseUrl =
-        this.config.hrmApiBaseUrl || 'https://api.hrm.kaopiz.com';
+        this.config.hrmApiBaseUrl || 'https://api.hrm.kaopiz.com/api';
       const response = await firstValueFrom(
-        this.httpService.get(`${hrmApiBaseUrl}/api/auth/me`, {
+        this.httpService.get(`${hrmApiBaseUrl}/auth/me`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },

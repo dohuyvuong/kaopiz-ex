@@ -3,6 +3,7 @@ import {
   CanActivate,
   ExecutionContext,
   UnauthorizedException,
+  InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
@@ -30,10 +31,21 @@ export class JwtAuthSystemGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const authHeader = request.headers.authorization;
 
-    // Lấy system từ metadata (decorator) hoặc default là 'ksystem'
-    const system: SystemName =
-      this.reflector.get<SystemName>(SYSTEM_KEY, context.getHandler()) ||
-      SYSTEMS.KSYSTEM.name;
+    // Lấy system từ metadata (decorator)
+    const system: SystemName | undefined =
+      this.reflector.getAllAndOverride<SystemName>(SYSTEM_KEY, [
+        context.getHandler(),
+        context.getClass(),
+      ]);
+
+    if (!system) {
+      this.logger.error(
+        'System không được chỉ định. Sử dụng @Auth(system) decorator để chỉ định system.',
+      );
+      throw new InternalServerErrorException(
+        'System không được chỉ định. Vui lòng sử dụng @Auth(system) decorator.',
+      );
+    }
 
     if (!authHeader) {
       this.logger.warn('Request thiếu Authorization header');

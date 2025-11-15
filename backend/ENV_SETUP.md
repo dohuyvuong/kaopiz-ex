@@ -42,7 +42,9 @@ Các biến này dùng để đăng nhập vào HRM thông qua Ksystem OAuth.
 - Khi gọi `GET /auth/ksystem-oauth/authorize`, có thể truyền tham số `redirectOAuth` (ví dụ: `?redirectOAuth=http://localhost:3000/auth/callback`) để sau khi đăng nhập thành công, Ksystem sẽ redirect về URL đó với code trong query string. Điều này giúp client có thể lấy được code từ URL.
 
 ### HRM API
-- `HRM_API_BASE_URL`: Base URL của HRM API (mặc định: `https://api.hrm.kaopiz.com`)
+- `HRM_API_BASE_URL`: Base URL của HRM API, **đã bao gồm hậu tố `/api`** (mặc định: `https://api.hrm.kaopiz.com/api`)
+  - **Lưu ý**: Base URL này đã bao gồm `/api` ở cuối, vì vậy các endpoint sẽ không cần thêm `/api` nữa
+  - Ví dụ: Nếu `HRM_API_BASE_URL=https://api.hrm.kaopiz.com/api`, thì endpoint `/timesheets/owner-calendar` sẽ gọi đến `https://api.hrm.kaopiz.com/api/timesheets/owner-calendar`
 
 ## Lưu ý
 

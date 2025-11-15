@@ -1,14 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ChecklistService } from '../api/services/checklist.service';
+import { ChecklistService } from './checklist.service';
 import {
-  CodeReviewDetailResponse,
-  CodeReviewItemWithChecklist,
-  SubmitReviewPayload,
-  SubmitReviewCodeReview,
-  SubmitReviewCodeReviewDetail,
-  SubmitReviewResult,
-  SubmitReviewResultReviewer,
-} from '../api/services/checklist.service';
+  CodeReviewDetailResponseDto,
+  CodeReviewItemWithChecklistDto,
+  SubmitReviewPayloadDto,
+  SubmitReviewCodeReviewDto,
+  SubmitReviewCodeReviewDetailDto,
+  SubmitReviewResultDto,
+  SubmitReviewResultReviewerDto,
+} from './dto/checklist-api.dto';
 
 @Injectable()
 export class ChecklistAutoReviewService {
@@ -57,8 +57,8 @@ export class ChecklistAutoReviewService {
       try {
         const response = await this.checklistService.getMyPendingReviews({
           page: currentPage,
-          per_page: 20,
-          project_name: projectName,
+          perPage: 20,
+          projectName: projectName,
         });
 
         // Filter chỉ lấy những review có status = 3 (Đã self reviewed)
@@ -109,7 +109,7 @@ export class ChecklistAutoReviewService {
         if (maxReviews && processed >= maxReviews) {
           hasMore = false;
         } else {
-          hasMore = currentPage < response.last_page;
+          hasMore = currentPage < response.lastPage;
         }
         currentPage++;
       } catch (error) {
@@ -144,7 +144,7 @@ export class ChecklistAutoReviewService {
     this.logger.log(`Bắt đầu review code review ${codeReviewId}...`);
 
     // 1. Lấy chi tiết code review
-    const detail: CodeReviewDetailResponse =
+    const detail: CodeReviewDetailResponseDto =
       await this.checklistService.getCodeReviewDetail(codeReviewId);
 
     // Kiểm tra status = 3
@@ -161,7 +161,7 @@ export class ChecklistAutoReviewService {
     );
 
     // 3. Lấy checklist items với tags
-    const checklistItems: CodeReviewItemWithChecklist[] =
+    const checklistItems: CodeReviewItemWithChecklistDto[] =
       await this.checklistService.getCodeReviewChecklistItems(
         codeReviewId,
         tagIds.length > 0 ? tagIds : undefined,
@@ -207,19 +207,18 @@ export class ChecklistAutoReviewService {
    */
   private buildSubmitReviewPayload(
     codeReviewId: number,
-    detail: CodeReviewDetailResponse,
-    checklistItems: CodeReviewItemWithChecklist[],
-  ): SubmitReviewPayload {
+    detail: CodeReviewDetailResponseDto,
+    checklistItems: CodeReviewItemWithChecklistDto[],
+  ): SubmitReviewPayloadDto {
     const now = new Date();
-    const reviewedAt = now.toISOString().replace('T', ' ').substring(0, 19); // Format: YYYY-MM-DD HH:mm:ss
 
     // Build code_review_details
-    const codeReviewDetails: SubmitReviewCodeReviewDetail[] =
+    const codeReviewDetails: SubmitReviewCodeReviewDetailDto[] =
       checklistItems.map((item) => {
         // Lấy review_results từ checklist items
-        const reviewResults: SubmitReviewResult[] = item.checklist_item.map(
+        const reviewResults: SubmitReviewResultDto[] = item.checklistItem.map(
           (checklistItem) => {
-            const codeReviewDetail = checklistItem.code_review_detail;
+            const codeReviewDetail = checklistItem.codeReviewDetail;
 
             // Tìm reviewer_id của current user (cần lấy từ detail.reviewers)
             // Giả sử reviewer_id là reviewer đầu tiên trong danh sách
@@ -233,42 +232,42 @@ export class ChecklistAutoReviewService {
             }
 
             // Set reviewer status = author_review_status
-            const reviewers: SubmitReviewResultReviewer[] = [
+            const reviewers: SubmitReviewResultReviewerDto[] = [
               {
-                reviewer_id: reviewerId,
-                status: codeReviewDetail.author_review_status,
+                reviewerId: reviewerId,
+                status: codeReviewDetail.authorReviewStatus,
               },
             ];
 
-            // Lấy author_id từ code_review_detail, nếu không có thì lấy từ detail.author_id
-            const authorId = codeReviewDetail.author_id ?? detail.author_id;
+            // Lấy author_id từ code_review_detail, nếu không có thì lấy từ detail.authorId
+            const authorId = codeReviewDetail.authorId ?? detail.authorId;
 
             return {
-              checklist_item_id: checklistItem.id,
-              author_review_status: codeReviewDetail.author_review_status,
+              checklistItemId: checklistItem.id,
+              authorReviewStatus: codeReviewDetail.authorReviewStatus,
               reviewers,
               note: codeReviewDetail.note,
-              author_id: authorId,
+              authorId: authorId,
             };
           },
         );
 
         return {
           id: item.id,
-          review_results: reviewResults,
+          reviewResults: reviewResults,
         };
       });
 
     // Build code_review
-    const codeReview: SubmitReviewCodeReview = {
+    const codeReview: SubmitReviewCodeReviewDto = {
       id: codeReviewId,
       status: 1, // Pass checklist review
-      reviewed_at: reviewedAt,
+      reviewedAt: now,
     };
 
     return {
-      code_review: codeReview,
-      code_review_details: codeReviewDetails,
+      codeReview: codeReview,
+      codeReviewDetails: codeReviewDetails,
     };
   }
 }

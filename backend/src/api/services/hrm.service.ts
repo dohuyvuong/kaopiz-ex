@@ -19,7 +19,7 @@ export class HRMService {
     @Inject('APP_CONFIG') protected readonly config: AppConfig,
   ) {
     this.logger = new Logger(HRMService.name);
-    this.baseURL = config.hrmApiBaseUrl || 'https://api.hrm.kaopiz.com';
+    this.baseURL = config.hrmApiBaseUrl || 'https://api.hrm.kaopiz.com/api';
   }
 
   /**
@@ -27,7 +27,7 @@ export class HRMService {
    */
   async validateToken(token: string): Promise<boolean> {
     try {
-      await this.callAPI<unknown>('/api/auth/me', 'GET', token);
+      await this.callAPI<unknown>('/auth/me', 'GET', token);
       return true;
     } catch (error) {
       const axiosError = error as AxiosError;

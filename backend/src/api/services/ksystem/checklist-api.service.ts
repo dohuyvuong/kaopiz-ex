@@ -1,7 +1,7 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { REQUEST } from '@nestjs/core';
-import { AuthenticatedRequest } from '../../common/types/request.types';
-import { KsystemService } from './ksystem.service';
+import { AuthenticatedRequest } from '../../../common/types/request.types';
+import { KsystemService } from '../ksystem.service';
 
 // Code Review interfaces
 export interface CodeReviewReviewer {
@@ -237,22 +237,23 @@ export interface SubmitReviewPayload {
 }
 
 @Injectable()
-export class ChecklistService {
+export class ChecklistApiService {
   constructor(
     private readonly ksystemService: KsystemService,
     @Inject(REQUEST) private readonly request: AuthenticatedRequest,
   ) {}
 
   /**
-   * Lấy token từ request (đã được validate bởi JwtAuthGuard)
+   * Lấy token từ request (đã được validate bởi JwtAuthSystemGuard)
    */
   private getToken(): string {
     return this.request.token;
   }
 
   /**
-   * Lấy danh sách code reviews đang chờ tôi review
+   * Lấy danh sách code reviews đang chờ tôi review từ Ksystem API
    * Sử dụng các tham số cố định: viewer=is_reviewer&status_in=3
+   * @returns Raw data từ Ksystem API (snake_case)
    */
   async getMyPendingReviews(params?: {
     sort?: string;
@@ -261,7 +262,7 @@ export class ChecklistService {
     project_name?: string;
     author_email?: string;
     [key: string]: unknown;
-  }): Promise<CodeReviewListResponse> {
+  }): Promise<unknown> {
     const queryParams = new URLSearchParams();
 
     // Tham số cố định
@@ -290,11 +291,12 @@ export class ChecklistService {
   }
 
   /**
-   * Lấy danh sách code reviews với các tham số tùy chỉnh
+   * Lấy danh sách code reviews với các tham số tùy chỉnh từ Ksystem API
+   * @returns Raw data từ Ksystem API (snake_case)
    */
   async getCodeReviewsToReview(
     params?: GetCodeReviewsParams,
-  ): Promise<CodeReviewListResponse> {
+  ): Promise<unknown> {
     const queryParams = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
@@ -317,9 +319,10 @@ export class ChecklistService {
   }
 
   /**
-   * Lấy thông tin chi tiết của một code review
+   * Lấy thông tin chi tiết của một code review từ Ksystem API
+   * @returns Raw data từ Ksystem API (snake_case)
    */
-  async getCodeReviewDetail(id: number): Promise<CodeReviewDetailResponse> {
+  async getCodeReviewDetail(id: number): Promise<unknown> {
     const queryParams = new URLSearchParams();
     queryParams.append('id', String(id));
     queryParams.append('detail', 'true');
@@ -332,14 +335,15 @@ export class ChecklistService {
   }
 
   /**
-   * Lấy checklist items của một code review
+   * Lấy checklist items của một code review từ Ksystem API
    * @param id - ID của code review
    * @param tagIds - Mảng các tag IDs để filter (optional)
+   * @returns Raw data từ Ksystem API (snake_case)
    */
   async getCodeReviewChecklistItems(
     id: number,
     tagIds?: number[],
-  ): Promise<CodeReviewItemWithChecklist[]> {
+  ): Promise<unknown> {
     const queryParams = new URLSearchParams();
 
     // Xử lý tag_ids[] dạng array
@@ -357,14 +361,12 @@ export class ChecklistService {
   }
 
   /**
-   * Submit review code
+   * Submit review code từ Ksystem API
    * @param id - ID của code review
-   * @param payload - Payload chứa thông tin review
+   * @param payload - Payload chứa thông tin review (snake_case)
+   * @returns Raw response từ Ksystem API
    */
-  async submitReview(
-    id: number,
-    payload: SubmitReviewPayload,
-  ): Promise<boolean> {
+  async submitReview(id: number, payload: unknown): Promise<unknown> {
     const endpoint = `/code-reviews/${id}/review`;
     return this.ksystemService.post<boolean>(
       endpoint,

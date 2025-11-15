@@ -1,8 +1,9 @@
 import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
-import { ChecklistService } from './services/checklist.service';
+import { ChecklistApiService } from './services/ksystem/checklist-api.service';
 import { KsystemService } from './services/ksystem.service';
 import { HRMService } from './services/hrm.service';
+import { TimesheetApiService } from './services/hrm/timesheet-api.service';
 import { AppConfigModule } from '../config/config.module';
 import { AppConfigService } from '../config/config.service';
 
@@ -10,8 +11,9 @@ import { AppConfigService } from '../config/config.service';
   imports: [HttpModule, AppConfigModule],
   providers: [
     KsystemService,
-    ChecklistService,
+    ChecklistApiService,
     HRMService,
+    TimesheetApiService,
     {
       provide: 'APP_CONFIG',
       useFactory: (configService: AppConfigService) =>
@@ -19,6 +21,6 @@ import { AppConfigService } from '../config/config.service';
       inject: [AppConfigService],
     },
   ],
-  exports: [KsystemService, ChecklistService, HRMService],
+  exports: [KsystemService, ChecklistApiService, HRMService, TimesheetApiService],
 })
 export class ApiModule {}

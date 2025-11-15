@@ -43,7 +43,7 @@ export class AppConfigService {
       // HRM API
       hrmApiBaseUrl:
         this.configService.get<string>('HRM_API_BASE_URL') ||
-        'https://api.hrm.kaopiz.com',
+        'https://api.hrm.kaopiz.com/api',
     };
   }
 }

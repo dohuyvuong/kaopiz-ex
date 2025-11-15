@@ -142,9 +142,9 @@ export function ChecklistPreviewTable({
                     <div className="max-w-md truncate" title={review.description}>
                       {review.description}
                     </div>
-                    {review.jira_url && (
+                    {review.jiraUrl && (
                       <Link
-                        href={review.jira_url}
+                        href={review.jiraUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-xs text-blue-600 hover:underline flex items-center gap-1 mt-1"
@@ -168,7 +168,7 @@ export function ChecklistPreviewTable({
                   </TableCell>
                   <TableCell>{getStatusBadge(review.status)}</TableCell>
                   <TableCell className="text-sm">
-                    {formatDate(review.created_at)}
+                    {formatDate(review.createdAt)}
                   </TableCell>
                   <TableCell>
                     <Link

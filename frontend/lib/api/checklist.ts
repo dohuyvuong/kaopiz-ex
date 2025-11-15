@@ -2,58 +2,114 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8
 
 export interface CodeReview {
   id: number;
-  project_id: number;
-  author_id: number;
-  jira_url: string;
+  projectId: number;
+  authorId: number;
+  jiraUrl: string;
   description: string;
   status: number;
-  reviewed_at: string | null;
-  created_at: string;
+  reviewedAt: string | null;
+  createdAt: string;
   project: {
     id: number;
     code: string;
     name: string;
+    departmentId: number;
+    driveName: string | null;
+    totalProjectSize: number;
+    totalReEstimate: number;
   };
   author: {
     id: number;
     email: string;
+    name?: string;
+    departmentNames: string[];
+    departmentCodes: string[];
+    roleNames: string[] | null;
+    jobTitleNames: string[] | null;
+    jobTitleCodes: string[] | null;
+    departmentShortName: string;
+    levelNames: string[] | null;
+    departmentJobTitles: unknown[];
+    departments: unknown[];
   };
   reviewers: Array<{
     id: number;
     email: string;
+    name?: string;
+    departmentNames: string[];
+    departmentCodes: string[];
+    roleNames: string[] | null;
+    jobTitleNames: string[] | null;
+    jobTitleCodes: string[] | null;
+    departmentShortName: string;
+    levelNames: string[] | null;
+    pivot: {
+      codeReviewId: number;
+      reviewerId: number;
+    };
+    departmentJobTitles: unknown[];
+    departments: unknown[];
   }>;
   tags: Array<{
     id: number;
     name: string;
+    pivot: {
+      codeReviewId: number;
+      checklistTagId: number;
+    };
+  }>;
+  codeReviewItems: Array<{
+    id: number;
+    codeReviewId: number;
+    repositoryId: number;
+    checklistId: number;
+    pullRequestUrl: string;
+    checklistItemsIds: number[];
+    reviewResults: Array<{
+      note: string | null;
+      authorId?: number;
+      reviewers: Array<{
+        status: number;
+        reviewerId: number;
+      }>;
+      checklistItemId: number;
+      authorReviewStatus: number;
+    }>;
+    countComments: number | null;
+    countLineCodeChange: number | null;
+    commentPerChangeRate: number | null;
+    deletedAt: string | null;
+    createdAt: string;
+    updatedAt: string;
   }>;
   [key: string]: unknown;
 }
 
 export interface CodeReviewListResponse {
-  current_page: number;
+  currentPage: number;
   data: CodeReview[];
-  first_page_url: string;
+  firstPageUrl: string;
   from: number;
-  last_page: number;
-  last_page_url: string;
-  next_page_url: string | null;
+  lastPage: number;
+  lastPageUrl: string;
+  nextPageUrl: string | null;
   path: string;
-  per_page: number;
-  prev_page_url: string | null;
+  perPage: number;
+  prevPageUrl: string | null;
   to: number;
   total: number;
 }
 
 export interface GetCodeReviewsParams {
-  project_name?: string;
-  author_email?: string;
-  reviewer_email?: string;
+  projectName?: string;
+  authorEmail?: string;
+  reviewerEmail?: string;
   status?: string;
   viewer?: string;
-  status_in?: number | number[];
+  statusIn?: number | number[];
   sort?: string;
   page?: number;
-  per_page?: number;
+  perPage?: number;
 }
 
 export const checklistApi = {
