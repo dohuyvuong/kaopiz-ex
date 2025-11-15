@@ -4,6 +4,7 @@ import { ChecklistApiService } from './services/ksystem/checklist-api.service';
 import { KsystemService } from './services/ksystem.service';
 import { HRMService } from './services/hrm.service';
 import { TimesheetApiService } from './services/hrm/timesheet-api.service';
+import { ApplicationApiService } from './services/hrm/application-api.service';
 import { AppConfigModule } from '../config/config.module';
 import { AppConfigService } from '../config/config.service';
 
@@ -14,6 +15,7 @@ import { AppConfigService } from '../config/config.service';
     ChecklistApiService,
     HRMService,
     TimesheetApiService,
+    ApplicationApiService,
     {
       provide: 'APP_CONFIG',
       useFactory: (configService: AppConfigService) =>
@@ -21,6 +23,12 @@ import { AppConfigService } from '../config/config.service';
       inject: [AppConfigService],
     },
   ],
-  exports: [KsystemService, ChecklistApiService, HRMService, TimesheetApiService],
+  exports: [
+    KsystemService,
+    ChecklistApiService,
+    HRMService,
+    TimesheetApiService,
+    ApplicationApiService,
+  ],
 })
 export class ApiModule {}

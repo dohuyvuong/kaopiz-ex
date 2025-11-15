@@ -125,4 +125,53 @@ export class HRMService {
   async delete<T = unknown>(endpoint: string, token: string): Promise<T> {
     return this.callAPI<T>(endpoint, 'DELETE', token);
   }
+
+  /**
+   * Gửi POST request với FormData (multipart/form-data)
+   */
+  async postFormData<T = unknown>(
+    endpoint: string,
+    formData: FormData,
+    token: string,
+  ): Promise<T> {
+    try {
+      const url = `${this.baseURL}${endpoint}`;
+
+      const config: AxiosRequestConfig = {
+        method: 'post',
+        url,
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        data: formData,
+        timeout: 30000,
+      };
+
+      const response = await firstValueFrom(
+        this.httpService.request<T>(config),
+      );
+      return response.data;
+    } catch (error) {
+      const axiosError = error as AxiosError;
+      if (axiosError.response) {
+        this.logger.error(
+          `API Error [${axiosError.response.status}]:`,
+          axiosError.response.data,
+        );
+        throw new Error(
+          `API Error: ${axiosError.response.status} - ${JSON.stringify(axiosError.response.data)}`,
+        );
+      } else if (axiosError.request) {
+        const errorMessage =
+          axiosError instanceof Error ? axiosError.message : 'Unknown error';
+        this.logger.error('No response from API:', errorMessage);
+        throw new Error(`Network Error: ${errorMessage}`);
+      } else {
+        const errorMessage =
+          axiosError instanceof Error ? axiosError.message : 'Unknown error';
+        this.logger.error('Error:', errorMessage);
+        throw axiosError;
+      }
+    }
+  }
 }

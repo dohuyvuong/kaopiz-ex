@@ -21,39 +21,7 @@ export interface WorkingTime {
   timezoneValue: string;
 }
 
-export interface TrackingTime {
-  date?: string;
-  dateStart?: string;
-  dateEnd?: string;
-  timeStart?: string;
-  timeEnd?: string;
-  timeOff?: string | null;
-  countHour?: number;
-  reason?: string;
-  reasonId?: number;
-  isCalculateSalary?: number;
-}
-
-export interface ApplicationFormData {
-  reasonId?: number;
-  trackingTimes?: TrackingTime[];
-  annualLeaveUsed?: {
-    lastYear: number;
-    thisYear: number;
-  };
-  time?: string;
-}
-
-export interface ApplicationForm {
-  id: number;
-  userId: number;
-  typeId: number; // 1: Nghỉ phép, 2: Vắng mặt, 3: Check-in/out, 4: Check-out, ...
-  startDate: string | null; // ISO date string (ví dụ: "2025-10-16T00:00:00.000Z")
-  endDate: string | null; // ISO date string (ví dụ: "2025-10-16T00:00:00.000Z")
-  data: ApplicationFormData;
-  createdAt: string | null; // ISO date string (ví dụ: "2025-10-16T08:30:00.000Z")
-  user?: unknown;
-}
+import { ApplicationForm } from './application';
 
 export interface LogWork {
   id: number;

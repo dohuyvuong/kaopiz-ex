@@ -2,6 +2,7 @@ import { combineReducers, configureStore } from '@reduxjs/toolkit';
 import { persistReducer } from 'redux-persist';
 import authReducer from './features/auth/authSlice';
 import sidebarReducer from './features/sidebar/sidebarSlice';
+import applicationFormReducer from './features/application-form/applicationFormSlice';
 import { localStorage } from './storage';
 
 const appReducer = combineReducers({
@@ -18,6 +19,13 @@ const appReducer = combineReducers({
       storage: localStorage,
     },
     sidebarReducer,
+  ),
+  applicationForm: persistReducer(
+    {
+      key: 'applicationForm',
+      storage: localStorage,
+    },
+    applicationFormReducer,
   ),
 });
 

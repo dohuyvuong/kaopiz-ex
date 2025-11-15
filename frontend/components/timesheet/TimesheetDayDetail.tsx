@@ -3,18 +3,32 @@
 import { TimesheetDay } from '@/lib/types/timesheet';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Clock, AlertCircle, CheckCircle2, Briefcase, FileText } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Clock, AlertCircle, CheckCircle2, Briefcase, FileText, Plus } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { useTimesheetDayDetail } from '@/hooks/use-timesheet-day-detail';
+import { CreateApplicationFormDialog } from './CreateApplicationFormDialog';
+import { useState, useMemo } from 'react';
+
+interface TimesheetDayDetailData {
+  calendarDay?: TimesheetDay | null;
+  workingTime?: { workStart: string; workEnd: string } | null;
+  calendarDays?: Array<{ date: Date; timesheet: TimesheetDay | null }>;
+  userId?: number;
+}
 
 interface TimesheetDayDetailProps {
   date: string | null;
-  calendarDay?: TimesheetDay | null; // Day từ calendar (có logWork và approvedApplicationForms)
+  data?: TimesheetDayDetailData;
   onClose: () => void;
 }
 
-export function TimesheetDayDetail({ date, calendarDay, onClose }: TimesheetDayDetailProps) {
+export function TimesheetDayDetail({ date, data, onClose }: TimesheetDayDetailProps) {
+  const calendarDay = data?.calendarDay;
+  const workingTime = data?.workingTime;
+  const calendarDays = data?.calendarDays;
+  const userId = data?.userId;
   const {
     isLoading,
     error,
@@ -25,8 +39,26 @@ export function TimesheetDayDetail({ date, calendarDay, onClose }: TimesheetDayD
     formatDate,
     formatDateTime,
   } = useTimesheetDayDetail(date);
+  const [showCreateFormDialog, setShowCreateFormDialog] = useState(false);
+
+  // Kiểm tra xem có đơn chưa approve (status !== 3) và là typeId 1 hoặc 2 cho ngày đó không
+  // Logic này giống với hasPendingForms trong calendar
+  const hasPendingForms = useMemo(() => {
+    // Kiểm tra từ day detail (tất cả đơn, bao gồm cả chưa approve)
+    const hasPending = day?.applicationForms?.some(
+      (form) => form.status !== 3 && (form.typeId === 1 || form.typeId === 2),
+    );
+
+    return hasPending || false;
+  }, [day]);
 
   if (!date) return null;
+
+  const handleCreateFormSuccess = () => {
+    // Reload data sau khi tạo đơn thành công
+    // Component sẽ tự động reload khi date thay đổi hoặc khi parent reload
+    window.location.reload(); // Tạm thời dùng reload, có thể cải thiện sau
+  };
 
   return (
     <Sheet open={!!date} onOpenChange={(open) => !open && onClose()}>
@@ -78,15 +110,40 @@ export function TimesheetDayDetail({ date, calendarDay, onClose }: TimesheetDayD
                 {/* Thông tin đi muộn/về sớm */}
                 {calendarDay && (calendarDay.minutesLate > 0 || calendarDay.minutesEarly > 0) && (
                   <div className="pt-2 border-t">
-                    <div className="text-sm text-muted-foreground mb-2">Đi muộn/Về sớm:</div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-sm text-muted-foreground">Đi muộn/Về sớm:</div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowCreateFormDialog(true)}
+                        className="h-7 text-xs"
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        Tạo đơn
+                      </Button>
+                    </div>
                     <div className="flex items-center gap-2 flex-wrap">
                       {calendarDay.minutesLate > 0 && (
-                        <Badge variant="destructive" className="text-sm">
+                        <Badge
+                          variant={hasPendingForms ? 'secondary' : 'destructive'}
+                          className={`text-sm ${
+                            hasPendingForms
+                              ? 'bg-orange-100 text-orange-800 border-orange-300'
+                              : ''
+                          }`}
+                        >
                           Đi muộn: {calendarDay.minutesLate} phút
                         </Badge>
                       )}
                       {calendarDay.minutesEarly > 0 && (
-                        <Badge variant="destructive" className="text-sm">
+                        <Badge
+                          variant={hasPendingForms ? 'secondary' : 'destructive'}
+                          className={`text-sm ${
+                            hasPendingForms
+                              ? 'bg-orange-100 text-orange-800 border-orange-300'
+                              : ''
+                          }`}
+                        >
                           Về sớm: {calendarDay.minutesEarly} phút
                         </Badge>
                       )}
@@ -160,14 +217,25 @@ export function TimesheetDayDetail({ date, calendarDay, onClose }: TimesheetDayD
             )}
 
             {/* Các đơn */}
-            {(day.applicationForms && day.applicationForms.length > 0) || (calendarDay?.approvedApplicationForms && calendarDay.approvedApplicationForms.length > 0) ? (
-              <Card>
-                <CardHeader>
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
                   <CardTitle className="text-lg flex items-center gap-2">
                     <FileText className="h-5 w-5" />
                     Đơn
                   </CardTitle>
-                </CardHeader>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowCreateFormDialog(true)}
+                    className="h-8 text-xs"
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Tạo đơn
+                  </Button>
+                </div>
+              </CardHeader>
+              {(day.applicationForms && day.applicationForms.length > 0) || (calendarDay?.approvedApplicationForms && calendarDay.approvedApplicationForms.length > 0) ? (
                 <CardContent className="space-y-3">
                   {/* Đơn từ day detail API */}
                   {day.applicationForms && day.applicationForms.map((form, index) => (
@@ -270,10 +338,31 @@ export function TimesheetDayDetail({ date, calendarDay, onClose }: TimesheetDayD
                     );
                   })}
                 </CardContent>
-              </Card>
-            ) : null}
+              ) : (
+                <CardContent>
+                  <div className="text-center py-4 text-sm text-muted-foreground">
+                    Chưa có đơn từ nào
+                  </div>
+                </CardContent>
+              )}
+            </Card>
           </div>
         )}
+
+        {/* Create Application Form Dialog */}
+               <CreateApplicationFormDialog
+                 open={showCreateFormDialog}
+                 onOpenChange={setShowCreateFormDialog}
+                 data={{
+                   date: date,
+                   calendarDay,
+                   workingTime,
+                   calendarDays,
+                   dayDetail: day ? { applicationForms: day.applicationForms } : null,
+                   userId,
+                 }}
+                 onSuccess={handleCreateFormSuccess}
+               />
       </SheetContent>
     </Sheet>
   );

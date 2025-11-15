@@ -5,6 +5,7 @@ import { AuthModule } from './auth/auth.module';
 import { ApiModule } from './api/api.module';
 import { ChecklistModule } from './checklist/checklist.module';
 import { TimesheetModule } from './timesheet/timesheet.module';
+import { ApplicationModule } from './application/application.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 @Module({
@@ -14,6 +15,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
     ApiModule,
     ChecklistModule,
     TimesheetModule,
+    ApplicationModule,
   ],
   providers: [
     {

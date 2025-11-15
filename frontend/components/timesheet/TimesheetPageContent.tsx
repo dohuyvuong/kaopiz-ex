@@ -57,7 +57,12 @@ export function TimesheetPageContent() {
       />
       <TimesheetDayDetail
         date={selectedDate}
-        calendarDay={selectedDay}
+        data={{
+          calendarDay: selectedDay,
+          workingTime: calendar?.workingTime || null,
+          calendarDays,
+          userId: calendar?.userId,
+        }}
         onClose={onCloseDetail}
       />
     </div>

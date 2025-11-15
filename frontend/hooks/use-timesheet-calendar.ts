@@ -34,6 +34,7 @@ interface UseTimesheetCalendarReturn {
     timelines: TimesheetDay[];
     workingTime: { workStart: string; workEnd: string; timezone: string; timezoneValue: string };
     summary: { minutesLate: number; minutesEarly: number };
+    userId?: number;
   } | null;
 
   // Calendar computed values
@@ -78,6 +79,7 @@ export function useTimesheetCalendar(): UseTimesheetCalendarReturn {
     timelines: TimesheetDay[];
     workingTime: { workStart: string; workEnd: string; timezone: string; timezoneValue: string };
     summary: { minutesLate: number; minutesEarly: number };
+    userId?: number;
   } | null>(null);
 
   // Calendar computed values
@@ -121,6 +123,7 @@ export function useTimesheetCalendar(): UseTimesheetCalendarReturn {
           timezoneValue: response.workingTime.timezoneValue,
         },
         summary: response.summary,
+        userId: response.userId,
       });
       // Gọi callback để update summary
       handleCalendarLoad(
