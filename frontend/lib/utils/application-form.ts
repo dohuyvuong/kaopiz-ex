@@ -100,10 +100,13 @@ export function checkOverlappingForms(
 
 /**
  * Kiểm tra đã có đơn vắng mặt (typeId 2) trong tuần chưa
+ * Bao gồm cả approved và pending forms
  */
 export function checkAbsenceFormInWeek(
   date: string,
   calendarDays: Array<{ date: Date; timesheet: TimesheetDay | null }> | undefined,
+  dayDetailMap?: Map<string, { applicationForms?: DayDetailApplicationForm[] }>,
+  mergedDays?: Map<string, TimesheetDay & { hasPendingForms?: boolean }>,
 ): boolean {
   if (!calendarDays || !date) return false;
 
@@ -114,17 +117,54 @@ export function checkAbsenceFormInWeek(
   return calendarDays.some(({ date: dayDate, timesheet }) => {
     if (!timesheet) return false;
     const day = dayjs(dayDate);
-    // Kiểm tra trong cùng tuần
-    if (day.isBefore(weekStart) || day.isAfter(weekEnd)) return false;
+    // Kiểm tra trong cùng tuần (bao gồm cả weekStart và weekEnd)
+    if (day.isBefore(weekStart, 'day') || day.isAfter(weekEnd, 'day')) return false;
 
-    // Kiểm tra có đơn vắng mặt (typeId 2) với reasonId 21 (Thay đổi thời gian làm việc)
-    return (
+    const dateStr = day.format('YYYY-MM-DD');
+
+    // Kiểm tra approved forms
+    // Đơn vắng mặt (typeId 2) với reasonId 21 (Thay đổi thời gian làm việc)
+    const hasApprovedAbsenceForm =
       timesheet.approvedApplicationForms?.some(
         (form) =>
           form.typeId === 2 &&
           form.data?.trackingTimes?.some((tt) => tt.reasonId === 21),
-      ) || false
-    );
+      ) || false;
+
+    if (hasApprovedAbsenceForm) return true;
+
+    // Kiểm tra pending forms từ mergedDays (ưu tiên vì có data cho tất cả các ngày trong tuần)
+    if (mergedDays) {
+      const mergedDay = mergedDays.get(dateStr);
+      if (mergedDay?.approvedApplicationForms) {
+        const approvedFormIds = new Set(
+          (timesheet.approvedApplicationForms || []).map((f) => f.id),
+        );
+        const hasPendingAbsenceForm = mergedDay.approvedApplicationForms.some(
+          (form) =>
+            form.typeId === 2 &&
+            form.data?.trackingTimes?.some((tt) => tt.reasonId === 21) &&
+            !approvedFormIds.has(form.id), // Chỉ lấy pending forms
+        );
+        if (hasPendingAbsenceForm) return true;
+      }
+    }
+
+    // Kiểm tra pending forms từ dayDetailMap (fallback, chỉ có data cho ngày hiện tại)
+    if (dayDetailMap) {
+      const dayDetail = dayDetailMap.get(dateStr);
+      const hasPendingAbsenceForm =
+        dayDetail?.applicationForms?.some(
+          (form) =>
+            form.typeId === 2 &&
+            form.status !== 3 && // Chưa approve
+            form.data?.trackingTimes?.some((tt) => tt.reasonId === 21),
+        ) || false;
+
+      if (hasPendingAbsenceForm) return true;
+    }
+
+    return false;
   });
 }
 

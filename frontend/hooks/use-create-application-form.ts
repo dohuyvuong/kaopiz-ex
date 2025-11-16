@@ -24,6 +24,7 @@ interface UseCreateApplicationFormProps {
   calendarDay?: TimesheetDay | null;
   workingTime?: { workStart: string; workEnd: string } | null;
   calendarDays?: Array<{ date: Date; timesheet: TimesheetDay | null }>;
+  mergedDays?: Map<string, TimesheetDay & { hasPendingForms?: boolean }>;
   dayDetail?: { applicationForms?: DayDetailApplicationForm[] } | null;
   userId?: number; // User ID từ calendar response
 }
@@ -62,7 +63,7 @@ interface UseCreateApplicationFormReturn {
   minutes: number | null;
 
   // Actions
-  handleSubmit: () => Promise<void>;
+  handleSubmit: () => Promise<boolean>;
   validate: () => boolean;
 }
 
@@ -73,6 +74,7 @@ export function useCreateApplicationForm({
   calendarDay,
   workingTime,
   calendarDays,
+  mergedDays,
   dayDetail,
   userId,
 }: UseCreateApplicationFormProps): UseCreateApplicationFormReturn {
@@ -355,15 +357,73 @@ export function useCreateApplicationForm({
     [calendarDay, workingTime],
   );
 
+  // Helper function để tạo dayDetailMap
+  const createDayDetailMap = useCallback((): Map<string, { applicationForms?: DayDetailApplicationForm[] }> => {
+    const dayDetailMap = new Map<string, { applicationForms?: DayDetailApplicationForm[] }>();
+    if (dayDetail?.applicationForms && !mergedDays) {
+      const dayDate = dayjs(date);
+      calendarDays?.forEach(({ date: dayDateItem }) => {
+        const dateStr = dayjs(dayDateItem).format('YYYY-MM-DD');
+        if (dayjs(dateStr).isSame(dayDate, 'day')) {
+          dayDetailMap.set(dateStr, { applicationForms: dayDetail.applicationForms });
+        }
+      });
+    }
+    return dayDetailMap;
+  }, [dayDetail, mergedDays, date, calendarDays]);
+
+  // Hàm tập trung để tính toán warningMessage cho tất cả các trường hợp
+  const getWarningMessage = useCallback((): string | null => {
+    if (!open) return null;
+
+    // 1. Kiểm tra overlap (ưu tiên cao nhất)
+    if (timeStart && timeEnd) {
+      const hasOverlap = checkOverlappingForms(
+        timeStart,
+        timeEnd,
+        calendarDay,
+        dayDetail,
+      );
+      if (hasOverlap) {
+        return 'Ngày này đã có đơn trùng lặp thời gian. Vui lòng kiểm tra lại.';
+      }
+    }
+
+    // 2. Kiểm tra quá hạn làm đơn
+    const selectedDate = dayjs(date);
+    const today = dayjs();
+    const minDate = today.subtract(7, 'day'); // 7 ngày trước từ hôm nay
+    if (selectedDate.isBefore(minDate, 'day')) {
+      return 'Đã quá hạn làm đơn cho ngày này';
+    }
+
+    // 3. Kiểm tra đã có đơn vắng mặt trong tuần (chỉ khi typeId === 2)
+    if (typeId === 2) {
+      const dayDetailMap = createDayDetailMap();
+      const hasAbsenceFormInWeek = checkAbsenceFormInWeek(date, calendarDays, dayDetailMap, mergedDays);
+      if (hasAbsenceFormInWeek) {
+        return 'Đã có đơn vắng mặt (Thay đổi thời gian làm việc) trong tuần này. Một tuần chỉ có thể có 1 đơn vắng mặt. Vui lòng tạo đơn xin nghỉ phép thay thế.';
+      }
+    }
+
+    return null;
+  }, [open, timeStart, timeEnd, calendarDay, dayDetail, date, typeId, calendarDays, mergedDays, createDayDetailMap]);
+
+  // Tính toán và set warningMessage khi các dependencies thay đổi
+  useEffect(() => {
+    const message = getWarningMessage();
+    setWarningMessage(message);
+  }, [getWarningMessage]);
+
   // Reset form khi mở dialog
   useEffect(() => {
     if (open) {
       setError(null);
       setValidationError(null);
-      setWarningMessage(null);
 
-      // Kiểm tra đã có đơn vắng mặt trong tuần chưa
-      const hasAbsenceFormInWeek = checkAbsenceFormInWeek(date, calendarDays);
+      // Kiểm tra đã có đơn vắng mặt trong tuần chưa để quyết định typeId ban đầu
+      const dayDetailMap = createDayDetailMap();
+      const hasAbsenceFormInWeek = checkAbsenceFormInWeek(date, calendarDays, dayDetailMap, mergedDays);
       const initialTypeId = hasAbsenceFormInWeek ? 1 : 2;
       setTypeId(initialTypeId);
 
@@ -372,77 +432,30 @@ export function useCreateApplicationForm({
       setTimeStart(autoTime.timeStart);
       setTimeEnd(autoTime.timeEnd);
     }
-  }, [open, date, calendarDays, calculateAutoTime]);
+  }, [open, date, calendarDays, mergedDays, dayDetail, calculateAutoTime, createDayDetailMap]);
 
   // Tự động tính toán lại khi typeId thay đổi
   useEffect(() => {
     if (open) {
-      // Kiểm tra và hiển thị cảnh báo khi chuyển sang đơn vắng mặt
-      if (typeId === 2) {
-        const hasAbsenceFormInWeek = checkAbsenceFormInWeek(date, calendarDays);
-        if (hasAbsenceFormInWeek) {
-          setWarningMessage(
-            'Đã có đơn vắng mặt (Thay đổi thời gian làm việc) trong tuần này. Một tuần chỉ có thể có 1 đơn vắng mặt. Vui lòng tạo đơn xin nghỉ phép thay thế.',
-          );
-        } else {
-          setWarningMessage(null);
-        }
-      } else {
-        setWarningMessage(null);
-      }
-
       // Tính toán lại thời gian
       const autoTime = calculateAutoTime(typeId);
       setTimeStart(autoTime.timeStart);
       setTimeEnd(autoTime.timeEnd);
     }
-  }, [typeId, open, date, calendarDays, calculateAutoTime]);
-
-  // Kiểm tra và cập nhật cảnh báo overlap
-  useEffect(() => {
-    if (open && timeStart && timeEnd) {
-      // Kiểm tra overlap với các đơn đã có trong ngày
-      const hasOverlap = checkOverlappingForms(
-        timeStart,
-        timeEnd,
-        calendarDay,
-        dayDetail,
-      );
-      if (hasOverlap) {
-        setWarningMessage(
-          'Ngày này đã có đơn trùng lặp thời gian. Vui lòng kiểm tra lại.',
-        );
-        return;
-      }
-
-      // Kiểm tra và hiển thị cảnh báo khi chuyển sang đơn vắng mặt
-      if (typeId === 2) {
-        const hasAbsenceFormInWeek = checkAbsenceFormInWeek(date, calendarDays);
-        if (hasAbsenceFormInWeek) {
-          setWarningMessage(
-            'Đã có đơn vắng mặt (Thay đổi thời gian làm việc) trong tuần này. Một tuần chỉ có thể có 1 đơn vắng mặt. Vui lòng tạo đơn xin nghỉ phép thay thế.',
-          );
-        } else {
-          setWarningMessage(null);
-        }
-      } else {
-        setWarningMessage(null);
-      }
-    }
-  }, [open, timeStart, timeEnd, typeId, calendarDay, calendarDays, date, dayDetail]);
+  }, [typeId, open, calculateAutoTime]);
 
   // Validation
   const validate = useCallback((): boolean => {
     setValidationError(null);
 
-    // Kiểm tra thời hạn: không được quá 1 tuần
+    // Kiểm tra thời hạn: chỉ cho phép tạo đơn trong vòng 7 ngày trở lại (từ hôm nay)
     const selectedDate = dayjs(date);
     const today = dayjs();
-    const daysDiff = today.diff(selectedDate, 'day');
-    if (daysDiff > 7) {
-      setValidationError(
-        'Đơn chỉ có thể được tạo trong vòng 1 tuần kể từ ngày áp dụng',
-      );
+    const minDate = today.subtract(7, 'day'); // 7 ngày trước từ hôm nay
+
+    // Chỉ cho phép tạo đơn từ hôm nay trở về 7 ngày
+    // Warning message đã được xử lý bởi getWarningMessage
+    if (selectedDate.isBefore(minDate, 'day')) {
       return false;
     }
 
@@ -502,7 +515,19 @@ export function useCreateApplicationForm({
       }
 
       // Kiểm tra một tuần chỉ có 1 đơn Vắng mặt - Thay đổi thời gian làm việc
-      const hasAbsenceFormInWeek = checkAbsenceFormInWeek(date, calendarDays);
+      // Tạo map từ dayDetail để kiểm tra pending forms (fallback nếu không có mergedDays)
+      const dayDetailMap = new Map<string, { applicationForms?: DayDetailApplicationForm[] }>();
+      if (dayDetail?.applicationForms && !mergedDays) {
+        // Chỉ tạo map nếu không có mergedDays (mergedDays đã có data cho tất cả các ngày)
+        const dayDate = dayjs(date);
+        calendarDays?.forEach(({ date: dayDateItem }) => {
+          const dateStr = dayjs(dayDateItem).format('YYYY-MM-DD');
+          if (dayjs(dateStr).isSame(dayDate, 'day')) {
+            dayDetailMap.set(dateStr, { applicationForms: dayDetail.applicationForms });
+          }
+        });
+      }
+      const hasAbsenceFormInWeek = checkAbsenceFormInWeek(date, calendarDays, dayDetailMap, mergedDays);
       if (hasAbsenceFormInWeek) {
         setValidationError(
           'Một tuần chỉ có thể có 1 đơn vắng mặt (Thay đổi thời gian làm việc). Vui lòng tạo đơn xin nghỉ phép thay thế.',
@@ -512,15 +537,15 @@ export function useCreateApplicationForm({
     }
 
     return true;
-  }, [date, typeId, timeStart, timeEnd, calendarDay, workingTime, calendarDays]);
+  }, [date, typeId, timeStart, timeEnd, calendarDay, workingTime, calendarDays, mergedDays, selectedType, approverIds, dayDetail]);
 
   // Handle submit
-  const handleSubmit = useCallback(async () => {
-    if (!validate()) return;
+  const handleSubmit = useCallback(async (): Promise<boolean> => {
+    if (!validate()) return false;
 
     if (!hrmToken) {
       setError('Chưa đăng nhập với HRM. Vui lòng đăng nhập.');
-      return;
+      return false;
     }
 
     setLoading(true);
@@ -576,10 +601,10 @@ export function useCreateApplicationForm({
       };
 
       await applicationApi.createApplicationForm(hrmToken, payload);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Lỗi khi tạo đơn từ',
-      );
+      return true;
+    } catch {
+      setError('Lỗi khi tạo đơn từ');
+      return false;
     } finally {
       setLoading(false);
     }

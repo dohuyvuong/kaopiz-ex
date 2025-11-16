@@ -52,15 +52,16 @@ export function TimesheetDayCell({
   return (
     <button
       onClick={() => {
-        if (isCurrentMonth && timesheet) {
+        if (isCurrentMonth && timesheet && !isLoading) {
           onDayClick(dateStr, timesheet);
         }
       }}
-      disabled={!isCurrentMonth || !timesheet}
+      disabled={!isCurrentMonth || !timesheet || isLoading}
       className={cn(
         'flex flex-col items-start p-2 min-h-[80px] border rounded-md text-left transition-colors',
         !isCurrentMonth && 'opacity-30 cursor-not-allowed',
-        isCurrentMonth && timesheet && 'cursor-pointer hover:bg-accent',
+        isCurrentMonth && timesheet && !isLoading && 'cursor-pointer hover:bg-accent',
+        isLoading && 'cursor-wait opacity-60',
         isToday && 'ring-2 ring-emerald-300',
         status === 'empty' && 'bg-muted/30',
         status === 'holiday' && 'bg-purple-50 border-purple-300',

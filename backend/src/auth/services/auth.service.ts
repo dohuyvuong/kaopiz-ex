@@ -26,7 +26,9 @@ export class AuthService {
    */
   private registerProvider(provider: AuthProvider): void {
     this.providers.set(provider.name, provider);
-    this.logger.log(`Đã đăng ký provider: ${provider.name} cho hệ thống: ${provider.system}`);
+    this.logger.log(
+      `Đã đăng ký provider: ${provider.name} cho hệ thống: ${provider.system}`,
+    );
   }
 
   /**

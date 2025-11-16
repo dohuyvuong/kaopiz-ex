@@ -6,7 +6,7 @@ import { TimesheetDayCell } from './TimesheetDayCell';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronLeft, ChevronRight, AlertCircle, RefreshCw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, AlertCircle, RefreshCw, Sparkles } from 'lucide-react';
 
 interface TimesheetCalendarProps {
   onDayClick: (date: string, day?: TimesheetDay) => void;
@@ -33,6 +33,7 @@ interface TimesheetCalendarProps {
   onMonthYearChange: (newMonth: number, newYear: number) => void;
   onReload: () => Promise<void>;
   formatMonthYear: (date: Date) => string;
+  onAutoCreate?: () => void;
 }
 
 export function TimesheetCalendar({
@@ -56,6 +57,7 @@ export function TimesheetCalendar({
   onMonthYearChange,
   onReload,
   formatMonthYear,
+  onAutoCreate,
 }: TimesheetCalendarProps) {
 
   if (isLoading) {
@@ -145,6 +147,20 @@ export function TimesheetCalendar({
             </div>
           </div>
         </div>
+        {calendar && (
+          <div className="flex items-center justify-end mt-2">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={onAutoCreate}
+              disabled={isLoading || dayDetailLoadingDates.size > 0}
+              className="gap-2"
+            >
+              <Sparkles className="h-4 w-4" />
+              Tự động tạo đơn
+            </Button>
+          </div>
+        )}
         {calendar && (
           <div className="flex items-center gap-4 text-sm text-muted-foreground mt-2 flex-wrap">
             <div>

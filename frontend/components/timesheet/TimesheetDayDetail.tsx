@@ -15,6 +15,7 @@ interface TimesheetDayDetailData {
   calendarDay?: TimesheetDay | null;
   workingTime?: { workStart: string; workEnd: string } | null;
   calendarDays?: Array<{ date: Date; timesheet: TimesheetDay | null }>;
+  mergedDays?: Map<string, TimesheetDay & { hasPendingForms?: boolean }>;
   userId?: number;
 }
 
@@ -22,12 +23,21 @@ interface TimesheetDayDetailProps {
   date: string | null;
   data?: TimesheetDayDetailData;
   onClose: () => void;
+  onApplicationFormCreated?: (date: string) => void;
+  isLoadingCalendar?: boolean;
 }
 
-export function TimesheetDayDetail({ date, data, onClose }: TimesheetDayDetailProps) {
+export function TimesheetDayDetail({
+  date,
+  data,
+  onClose,
+  onApplicationFormCreated,
+  isLoadingCalendar,
+}: TimesheetDayDetailProps) {
   const calendarDay = data?.calendarDay;
   const workingTime = data?.workingTime;
   const calendarDays = data?.calendarDays;
+  const mergedDays = data?.mergedDays;
   const userId = data?.userId;
   const {
     isLoading,
@@ -54,10 +64,11 @@ export function TimesheetDayDetail({ date, data, onClose }: TimesheetDayDetailPr
 
   if (!date) return null;
 
-  const handleCreateFormSuccess = () => {
-    // Reload data sau khi tạo đơn thành công
-    // Component sẽ tự động reload khi date thay đổi hoặc khi parent reload
-    window.location.reload(); // Tạm thời dùng reload, có thể cải thiện sau
+  const handleCreateFormSuccess = async () => {
+    // Đóng detail trước
+    onClose();
+    // Notify parent để reload calendar và tự động mở lại detail sau khi load xong
+    onApplicationFormCreated?.(date);
   };
 
   return (
@@ -67,7 +78,7 @@ export function TimesheetDayDetail({ date, data, onClose }: TimesheetDayDetailPr
           <SheetTitle>Chi tiết chấm công - {formatDate(date)}</SheetTitle>
         </SheetHeader>
 
-        {isLoading && (
+        {(isLoading || isLoadingCalendar) && (
           <div className="flex items-center justify-center h-64">
             <div className="text-muted-foreground">Đang tải...</div>
           </div>
@@ -80,7 +91,7 @@ export function TimesheetDayDetail({ date, data, onClose }: TimesheetDayDetailPr
           </div>
         )}
 
-        {day && !isLoading && (
+        {day && !isLoading && !isLoadingCalendar && (
           <div className="space-y-4 p-4">
             {/* Thông tin check-in/check-out */}
             <Card>
@@ -350,19 +361,20 @@ export function TimesheetDayDetail({ date, data, onClose }: TimesheetDayDetailPr
         )}
 
         {/* Create Application Form Dialog */}
-               <CreateApplicationFormDialog
-                 open={showCreateFormDialog}
-                 onOpenChange={setShowCreateFormDialog}
-                 data={{
-                   date: date,
-                   calendarDay,
-                   workingTime,
-                   calendarDays,
-                   dayDetail: day ? { applicationForms: day.applicationForms } : null,
-                   userId,
-                 }}
-                 onSuccess={handleCreateFormSuccess}
-               />
+        <CreateApplicationFormDialog
+          open={showCreateFormDialog}
+          onOpenChange={setShowCreateFormDialog}
+          data={{
+            date: date,
+            calendarDay,
+            workingTime,
+            calendarDays,
+            mergedDays,
+            dayDetail: day ? { applicationForms: day.applicationForms } : null,
+            userId,
+          }}
+          onSuccess={handleCreateFormSuccess}
+        />
       </SheetContent>
     </Sheet>
   );

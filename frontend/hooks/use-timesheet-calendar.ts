@@ -114,7 +114,7 @@ export function useTimesheetCalendar(): UseTimesheetCalendarReturn {
       setIsLoading(true);
       setError(null);
       const response = await timesheetApi.getCalendar(hrmToken, monthYear);
-      setCalendar({
+      const newCalendar = {
         timelines: response.timelines,
         workingTime: {
           workStart: response.workingTime.workStart,
@@ -124,7 +124,8 @@ export function useTimesheetCalendar(): UseTimesheetCalendarReturn {
         },
         summary: response.summary,
         userId: response.userId,
-      });
+      };
+      setCalendar(newCalendar);
       // Gọi callback để update summary
       handleCalendarLoad(
         {
@@ -133,6 +134,17 @@ export function useTimesheetCalendar(): UseTimesheetCalendarReturn {
         },
         monthYear,
       );
+      // Cập nhật selectedDay nếu đang có selectedDate
+      if (selectedDate) {
+        const day = response.timelines.find((t) => {
+          if (!t.date) return false;
+          const timesheetDate = dayjs(t.date).format('YYYY-MM-DD');
+          return timesheetDate === selectedDate;
+        });
+        if (day) {
+          setSelectedDay(day);
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Lỗi khi tải dữ liệu');
     } finally {
@@ -339,6 +351,16 @@ export function useTimesheetCalendar(): UseTimesheetCalendarReturn {
     // Chờ tất cả promises hoàn thành
     Promise.all(fetchPromises);
   }, [hrmToken, summary, viewMonthYear]);
+
+  // Cập nhật selectedDay khi mergedDays thay đổi (nếu đang có selectedDate)
+  useEffect(() => {
+    if (selectedDate && mergedDays.has(selectedDate)) {
+      const mergedDay = mergedDays.get(selectedDate);
+      if (mergedDay) {
+        setSelectedDay(mergedDay);
+      }
+    }
+  }, [selectedDate, mergedDays]);
 
   const onDayClick = (date: string, day?: TimesheetDay) => {
     setSelectedDate(date);

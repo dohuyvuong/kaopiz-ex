@@ -22,6 +22,7 @@ import {
 import { Combobox } from '@/components/ui/combobox';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import dayjs from 'dayjs';
+import { toast } from 'sonner';
 import { useCreateApplicationForm } from '@/hooks/use-create-application-form';
 
 interface CreateApplicationFormDialogData {
@@ -29,6 +30,7 @@ interface CreateApplicationFormDialogData {
   calendarDay?: TimesheetDay | null;
   workingTime?: { workStart: string; workEnd: string } | null;
   calendarDays?: Array<{ date: Date; timesheet: TimesheetDay | null }>;
+  mergedDays?: Map<string, TimesheetDay & { hasPendingForms?: boolean }>;
   dayDetail?: { applicationForms?: DayDetailApplicationForm[] } | null;
   userId?: number; // User ID từ calendar response
 }
@@ -77,14 +79,18 @@ export function CreateApplicationFormDialog({
     calendarDay: data.calendarDay,
     workingTime: data.workingTime,
     calendarDays: data.calendarDays,
+    mergedDays: data.mergedDays,
     dayDetail: data.dayDetail,
     userId: data.userId,
   });
 
   const handleSubmit = async () => {
-    await handleSubmitInternal();
-    onSuccess();
-    onOpenChange(false);
+    const success = await handleSubmitInternal();
+    if (success) {
+      toast.success('Tạo đơn từ thành công');
+      onSuccess();
+      onOpenChange(false);
+    }
   };
 
   return (
