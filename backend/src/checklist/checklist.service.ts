@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
+import dayjs from 'dayjs';
 import { ChecklistApiService } from '../api/services/ksystem/checklist-api.service';
 import {
   CodeReviewListResponseDto,
@@ -200,8 +201,8 @@ export class ChecklistService {
         id: payload.codeReview.id,
         status: payload.codeReview.status,
         reviewed_at: payload.codeReview.reviewedAt
-          ? payload.codeReview.reviewedAt.toISOString()
-          : new Date().toISOString(),
+          ? dayjs(payload.codeReview.reviewedAt).format('YYYY-MM-DD HH:mm:ss')
+          : dayjs().format('YYYY-MM-DD HH:mm:ss'),
       },
       code_review_details: payload.codeReviewDetails.map((detail) => ({
         id: detail.id,
