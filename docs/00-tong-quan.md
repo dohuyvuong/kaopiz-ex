@@ -1,0 +1,292 @@
+# Tổng quan hệ thống KaopizEX
+
+## Giới thiệu
+
+KaopizEX là hệ thống công cụ nội bộ của Kaopiz, được xây dựng để tích hợp và quản lý các hệ thống nội bộ như Ksystem và HRM. Hệ thống cung cấp các tính năng chính:
+
+- **Authentication & Authorization**: Multi-provider authentication với Microsoft SSO và Ksystem OAuth
+- **Timesheet Management**: Quản lý chấm công, xem lịch làm việc, tạo đơn từ
+- **Application Form Management**: Tạo và quản lý đơn từ (nghỉ phép, vắng mặt)
+- **Auto-create Applications**: Tự động tính toán và tạo đơn từ để giảm phạt đi muộn/về sớm
+- **Approver Settings**: Cấu hình người duyệt mặc định cho từng loại đơn
+
+## Kiến trúc tổng thể
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      KaopizEX System                         │
+├─────────────────────────────────────────────────────────────┤
+│                                                               │
+│  ┌──────────────┐         ┌──────────────┐                  │
+│  │   Frontend   │ ◄─────► │   Backend    │                  │
+│  │  (Next.js)   │  HTTP   │  (NestJS)    │                  │
+│  └──────────────┘         └──────────────┘                  │
+│         │                         │                           │
+│         │                         │                           │
+│         ▼                         ▼                           │
+│  ┌──────────────┐         ┌──────────────┐                  │
+│  │   Redux     │         │   Ksystem    │                  │
+│  │   Store     │         │     API      │                  │
+│  └──────────────┘         └──────────────┘                  │
+│         │                         │                           │
+│         │                         ▼                           │
+│         │                  ┌──────────────┐                  │
+│         │                  │     HRM      │                  │
+│         │                  │     API     │                  │
+│         │                  └──────────────┘                  │
+│         │                                                   │
+│         ▼                                                   │
+│  ┌──────────────┐                                          │
+│  │ localStorage │                                          │
+│  │  (Persist)   │                                          │
+│  └──────────────┘                                          │
+│                                                               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Frontend (Next.js)
+
+- **Framework**: Next.js 16.0.1 với App Router
+- **UI Library**: Shadcn UI (Radix UI + Tailwind CSS)
+- **State Management**: Redux Toolkit với Redux Persist
+- **Date/Time**: dayjs với plugins (utc, timezone)
+- **Notifications**: Sonner (toast notifications)
+
+### Backend (NestJS)
+
+- **Framework**: NestJS với TypeScript
+- **Architecture**: Modular architecture với controllers, services, providers
+- **Authentication**: Multi-provider authentication system
+- **API Integration**: HTTP clients cho Ksystem và HRM APIs
+
+## Tech Stack
+
+### Frontend Dependencies
+
+```json
+{
+  "next": "16.0.1",
+  "react": "19.2.0",
+  "@reduxjs/toolkit": "^2.10.1",
+  "redux-persist": "^6.0.0",
+  "dayjs": "^1.11.19",
+  "sonner": "^2.0.7",
+  "next-themes": "^0.4.6"
+}
+```
+
+### Backend Dependencies
+
+- NestJS core modules
+- HTTP client cho Ksystem và HRM APIs
+- JWT token management
+
+## Cấu trúc thư mục
+
+### Frontend
+
+```
+frontend/
+├── app/                          # Next.js App Router
+│   ├── (hrm)/                    # Routes yêu cầu HRM token
+│   │   └── timesheet/            # Timesheet page
+│   ├── (ksystem)/                # Routes yêu cầu Ksystem token
+│   │   └── checklist-review/     # Checklist review pages
+│   ├── (public)/                 # Public routes
+│   │   └── login/                # Login page
+│   └── layout.tsx                # Root layout
+├── components/                   # React components
+│   ├── account/                  # Account settings components
+│   ├── auth/                     # Authentication components
+│   ├── checklist/                # Checklist review components
+│   ├── timesheet/                # Timesheet components
+│   └── ui/                       # Shadcn UI components
+├── hooks/                        # Custom React hooks
+│   ├── use-create-application-form.ts
+│   ├── use-auto-create-applications.ts
+│   ├── use-approver-settings.ts
+│   ├── use-timesheet-calendar.ts
+│   └── use-timesheet-day-detail.ts
+├── lib/                          # Utilities và configurations
+│   ├── api/                      # API service functions
+│   │   ├── application.ts
+│   │   └── timesheet.ts
+│   ├── features/                 # Redux slices
+│   │   ├── auth/
+│   │   └── application-form/
+│   ├── store.ts                  # Redux store configuration
+│   ├── types/                    # TypeScript types
+│   └── utils/                    # Utility functions
+│       ├── application-form.ts
+│       └── auto-create-applications.ts
+└── package.json
+```
+
+### Backend
+
+```
+backend/
+├── src/
+│   ├── api/                      # API integration services
+│   │   ├── services/
+│   │   │   ├── hrm/              # HRM API services
+│   │   │   └── ksystem/          # Ksystem API services
+│   │   └── api.module.ts
+│   ├── application/              # Application form module
+│   │   ├── application.controller.ts
+│   │   ├── application.service.ts
+│   │   └── dto/
+│   ├── auth/                     # Authentication module
+│   │   ├── auth.controller.ts
+│   │   ├── providers/            # Auth providers
+│   │   │   ├── microsoft-sso.provider.ts
+│   │   │   └── ksystem-oauth.provider.ts
+│   │   └── guards/               # Auth guards
+│   ├── timesheet/                # Timesheet module
+│   │   ├── timesheet.controller.ts
+│   │   ├── timesheet.service.ts
+│   │   └── dto/
+│   ├── checklist/               # Checklist review module
+│   ├── common/                   # Common utilities
+│   ├── config/                   # Configuration
+│   └── main.ts                   # Application entry point
+└── package.json
+```
+
+## Luồng dữ liệu chính
+
+### 1. Authentication Flow
+
+```
+User → Login Page → Select Provider → Get Auth URL →
+Open URL → Login → Copy Callback URL → Exchange Token →
+Save to Redux + localStorage → Redirect to Home
+```
+
+Chi tiết: [01-authentication.md](./01-authentication.md)
+
+### 2. Timesheet Flow
+
+```
+User → Timesheet Page → Load Calendar → Select Day →
+Load Day Detail → Merge Data (Approved + Pending) →
+Display → Create Form (Optional) → Reload Calendar
+```
+
+Chi tiết:
+- [02-timesheet-calendar.md](./02-timesheet-calendar.md)
+- [03-timesheet-day-detail.md](./03-timesheet-day-detail.md)
+
+### 3. Application Form Creation Flow
+
+```
+User → Open Create Form Dialog → Select Type →
+Select Reason → Select Approvers → Enter Time →
+Validate → Submit → API Call → Success → Reload Calendar
+```
+
+Chi tiết: [04-application-form-creation.md](./04-application-form-creation.md)
+
+### 4. Auto-create Applications Flow
+
+```
+User → Open Auto-create Dialog → Calculate Applications →
+Preview → Check Missing Approvers → Edit (Optional) →
+Submit → Create All → Progress Tracking → Reload Calendar
+```
+
+Chi tiết: [05-auto-create-applications.md](./05-auto-create-applications.md)
+
+## State Management
+
+### Redux Store Structure
+
+```typescript
+{
+  auth: {
+    tokens: {
+      ksystem?: TokenInfo,
+      hrm?: TokenInfo
+    },
+    isLoading: boolean
+  },
+  applicationForm: {
+    approvers: {
+      [typeId]: {
+        [order]: userId | null
+      }
+    }
+  },
+  sidebar: {
+    // Sidebar state
+  }
+}
+```
+
+Chi tiết: [08-state-management.md](./08-state-management.md)
+
+## API Endpoints
+
+### Authentication
+
+- `GET /auth/providers` - Lấy danh sách providers
+- `GET /auth/:provider/authorize` - Lấy authorization URL
+- `POST /auth/:provider/token` - Exchange token
+
+### Timesheet
+
+- `GET /timesheet/calendar?monthYear=MM-YYYY` - Lấy calendar data
+- `GET /timesheet/day-detail?date=YYYY-MM-DD` - Lấy day detail
+
+### Application
+
+- `GET /application/types` - Lấy danh sách loại đơn
+- `GET /application/reasons?typeId=1` - Lấy danh sách lý do
+- `GET /application/approval-assignments?typeId=1&order=1&userId=861` - Lấy người duyệt
+- `POST /application/forms` - Tạo đơn từ
+
+Chi tiết: [10-api-integration.md](./10-api-integration.md)
+
+## Mục lục tài liệu
+
+1. [00-tong-quan.md](./00-tong-quan.md) - Tổng quan hệ thống (file này)
+2. [01-authentication.md](./01-authentication.md) - Authentication & Authorization
+3. [02-timesheet-calendar.md](./02-timesheet-calendar.md) - Timesheet Calendar
+4. [03-timesheet-day-detail.md](./03-timesheet-day-detail.md) - Timesheet Day Detail
+5. [04-application-form-creation.md](./04-application-form-creation.md) - Application Form Creation
+6. [05-auto-create-applications.md](./05-auto-create-applications.md) - Auto-create Applications
+7. [06-approver-settings.md](./06-approver-settings.md) - Approver Settings
+8. [07-validation-utilities.md](./07-validation-utilities.md) - Validation Utilities
+9. [08-state-management.md](./08-state-management.md) - State Management
+10. [09-ui-components.md](./09-ui-components.md) - UI Components
+11. [10-api-integration.md](./10-api-integration.md) - API Integration
+
+## Development Setup
+
+### Frontend
+
+```bash
+cd frontend
+yarn install
+yarn dev
+```
+
+### Backend
+
+```bash
+cd backend
+yarn install
+yarn start:dev
+```
+
+## Environment Variables
+
+### Frontend (.env.local)
+
+```env
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+```
+
+### Backend (.env)
+
+Xem chi tiết trong `backend/.env.example`
