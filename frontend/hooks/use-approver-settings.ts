@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useAppSelector, useAppDispatch } from '@/lib/hooks';
-import { setApprover } from '@/lib/features/application-form/applicationFormSlice';
+import { useAuthStore } from '@/lib/stores/auth-store';
+import { useApplicationFormStore } from '@/lib/stores/application-form-store';
 import { applicationApi } from '@/lib/api/application';
 import {
   ApplicationFormType,
@@ -22,18 +22,10 @@ interface UseApproverSettingsReturn {
 }
 
 export function useApproverSettings(): UseApproverSettingsReturn {
-  const hrmToken = useAppSelector((state) => state.auth.tokens.hrm?.token);
-  const userId = useAppSelector((state) => {
-    const hrmUserInfo = state.auth.tokens.hrm?.userInfo;
-    if (hrmUserInfo && 'info' in hrmUserInfo) {
-      return hrmUserInfo.info.user_profile?.id;
-    }
-    return null;
-  });
-  const savedApprovers = useAppSelector(
-    (state) => state.applicationForm.approvers,
-  );
-  const dispatch = useAppDispatch();
+  const appToken = useAuthStore((state) => state.appToken);
+  const userId = useAuthStore((state) => state.user?.id || null);
+  const savedApprovers = useApplicationFormStore((state) => state.approvers);
+  const setApprover = useApplicationFormStore((state) => state.setApprover);
 
   const [types, setTypes] = useState<ApplicationFormType[]>([]);
   const [loading, setLoading] = useState(false);
@@ -45,14 +37,14 @@ export function useApproverSettings(): UseApproverSettingsReturn {
 
   // Fetch types
   useEffect(() => {
-    if (!hrmToken) {
+    if (!appToken) {
       return;
     }
 
     setLoading(true);
     setError(null);
     applicationApi
-      .getFormTypes(hrmToken)
+      .getFormTypes()
       .then((response) => {
         setTypes(response.items || []);
         setError(null);
@@ -67,11 +59,11 @@ export function useApproverSettings(): UseApproverSettingsReturn {
       .finally(() => {
         setLoading(false);
       });
-  }, [hrmToken]);
+  }, [appToken]);
 
   // Fetch approvers cho từng type
   useEffect(() => {
-    if (!hrmToken || !userId || types.length === 0) {
+    if (!appToken || !userId || types.length === 0) {
       return;
     }
 
@@ -85,7 +77,6 @@ export function useApproverSettings(): UseApproverSettingsReturn {
           for (let order = 1; order <= type.orderMax; order++) {
             try {
               const response = await applicationApi.getApprovalAssignments(
-                hrmToken,
                 type.id,
                 order,
                 userId,
@@ -108,13 +99,13 @@ export function useApproverSettings(): UseApproverSettingsReturn {
     };
 
     fetchApprovers();
-  }, [hrmToken, userId, types]);
+  }, [appToken, userId, types]);
 
   const handleApproverChange = useCallback(
     (typeId: number, order: number, approverId: number | null) => {
-      dispatch(setApprover({ typeId, order, userId: approverId }));
+      setApprover(typeId, order, approverId);
     },
-    [dispatch],
+    [setApprover],
   );
 
   return {

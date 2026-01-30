@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
-import { useAppSelector } from '@/lib/hooks';
+import { useAuthStore } from '@/lib/stores/auth-store';
 import { TimesheetDay } from '@/lib/types/timesheet';
 import { TimesheetDayDetailResponse } from '@/lib/types/timesheet-day-detail';
 import { timesheetApi } from '@/lib/api/timesheet';
@@ -58,7 +58,7 @@ interface UseTimesheetCalendarReturn {
 }
 
 export function useTimesheetCalendar(): UseTimesheetCalendarReturn {
-  const hrmToken = useAppSelector((state) => state.auth.tokens.hrm?.token);
+  const appToken = useAuthStore((state) => state.appToken);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<TimesheetDay | null>(null);
 
@@ -104,16 +104,10 @@ export function useTimesheetCalendar(): UseTimesheetCalendarReturn {
 
   // Hàm fetch calendar data
   const onReload = async () => {
-    if (!hrmToken) {
-      setError('Chưa đăng nhập với HRM. Vui lòng đăng nhập trước.');
-      setIsLoading(false);
-      return;
-    }
-
     try {
       setIsLoading(true);
       setError(null);
-      const response = await timesheetApi.getCalendar(hrmToken, monthYear);
+      const response = await timesheetApi.getCalendar(monthYear);
       const newCalendar = {
         timelines: response.timelines,
         workingTime: {
@@ -152,16 +146,16 @@ export function useTimesheetCalendar(): UseTimesheetCalendarReturn {
     }
   };
 
-  // Fetch calendar data khi monthYear hoặc hrmToken thay đổi
+  // Fetch calendar data khi monthYear hoặc appToken thay đổi
   useEffect(() => {
-    if (!hrmToken) {
+    if (!appToken) {
       setError('Chưa đăng nhập với HRM. Vui lòng đăng nhập trước.');
       setIsLoading(false);
       return;
     }
 
     onReload();
-  }, [hrmToken, monthYear]);
+  }, [appToken, monthYear]);
 
   // Navigation handlers
   const onPreviousMonth = () => {
@@ -249,7 +243,7 @@ export function useTimesheetCalendar(): UseTimesheetCalendarReturn {
 
   // Fetch day detail cho các ngày cần thiết
   useEffect(() => {
-    if (!hrmToken || !summary || !viewMonthYear) return;
+    if (!appToken || !summary || !viewMonthYear) return;
 
     // Kiểm tra xem tháng hiện tại có phải tháng hiện tại hoặc tháng trước không
     const now = new Date();
@@ -298,7 +292,7 @@ export function useTimesheetCalendar(): UseTimesheetCalendarReturn {
       setDayDetailLoadingDates((prev) => new Set(prev).add(dateStr));
 
       return timesheetApi
-        .getDayDetail(hrmToken, dateStr)
+        .getDayDetail(dateStr)
         .then((response: TimesheetDayDetailResponse) => {
           // Kiểm tra xem có đơn chưa approve không (status !== 3)
           const pendingForms = response.applicationForms.filter(
@@ -350,7 +344,7 @@ export function useTimesheetCalendar(): UseTimesheetCalendarReturn {
 
     // Chờ tất cả promises hoàn thành
     Promise.all(fetchPromises);
-  }, [hrmToken, summary, viewMonthYear]);
+  }, [appToken, summary, viewMonthYear]);
 
   // Cập nhật selectedDay khi mergedDays thay đổi (nếu đang có selectedDate)
   useEffect(() => {

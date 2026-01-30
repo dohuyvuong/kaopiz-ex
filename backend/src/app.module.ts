@@ -1,6 +1,7 @@
 import { Module, ValidationPipe } from '@nestjs/common';
 import { APP_FILTER, APP_PIPE } from '@nestjs/core';
 import { AppConfigModule } from './config/config.module';
+import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { ApiModule } from './api/api.module';
 import { ChecklistModule } from './checklist/checklist.module';
@@ -11,6 +12,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 @Module({
   imports: [
     AppConfigModule,
+    PrismaModule,
     AuthModule,
     ApiModule,
     ChecklistModule,

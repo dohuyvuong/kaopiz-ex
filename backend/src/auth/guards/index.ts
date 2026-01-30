@@ -1,1 +1,1 @@
-export { JwtAuthSystemGuard } from './jwt-auth-system.guard';
+export { AppJwtAuthGuard } from './app-jwt-auth.guard';

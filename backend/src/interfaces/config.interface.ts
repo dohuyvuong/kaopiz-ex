@@ -19,4 +19,8 @@ export interface AppConfig {
 
   // HRM API
   hrmApiBaseUrl?: string;
+
+  // App JWT
+  jwtSecret?: string;
+  jwtExpiresIn?: string;
 }

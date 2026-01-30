@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+import apiClient from './client';
 
 export interface CodeReview {
   id: number;
@@ -115,10 +115,9 @@ export interface GetCodeReviewsParams {
 export const checklistApi = {
   /**
    * Lấy danh sách code reviews đang chờ tôi review
-   * Yêu cầu token từ Ksystem (microsoft-sso)
+   * Token được tự động attach bởi API client interceptor
    */
   async getMyPendingReviews(
-    token: string,
     params?: {
       sort?: string;
       page?: number;
@@ -148,33 +147,18 @@ export const checklistApi = {
       }
     }
 
-    const url = `${API_BASE_URL}/checklist/pending-reviews${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    const queryString = queryParams.toString();
+    const url = `/checklist/pending-reviews${queryString ? `?${queryString}` : ''}`;
 
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({
-        message: 'Failed to get pending reviews',
-      }));
-      throw new Error(error.message || 'Failed to get pending reviews');
-    }
-
-    const result = await response.json();
-    return result.data;
+    const response = await apiClient.get<{ data: CodeReviewListResponse }>(url);
+    return response.data.data;
   },
 
   /**
    * Tự động review các checklist
-   * Yêu cầu token từ Ksystem (microsoft-sso)
+   * Token được tự động attach bởi API client interceptor
    */
   async autoReview(
-    token: string,
     params: {
       maxReviews: number;
       projectName: string;
@@ -193,24 +177,21 @@ export const checklistApi = {
     queryParams.append('maxReviews', String(params.maxReviews));
     queryParams.append('projectName', params.projectName);
 
-    const url = `${API_BASE_URL}/checklist/auto-review?${queryParams.toString()}`;
+    const url = `/checklist/auto-review?${queryParams.toString()}`;
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    const response = await apiClient.post<{
+      data: {
+        total: number;
+        success: number;
+        failed: number;
+        results: Array<{
+          codeReviewId: number;
+          success: boolean;
+          error?: string;
+        }>;
+      };
+    }>(url);
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({
-        message: 'Failed to auto review',
-      }));
-      throw new Error(error.message || 'Failed to auto review');
-    }
-
-    const result = await response.json();
-    return result.data;
+    return response.data.data;
   },
 };

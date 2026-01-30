@@ -25,15 +25,20 @@ export class ChecklistService {
   /**
    * Lấy danh sách code reviews đang chờ tôi review
    * Sử dụng các tham số cố định: viewer=is_reviewer&status_in=3
+   * @param token Ksystem JWT token
+   * @param params Query parameters
    */
-  async getMyPendingReviews(params?: {
-    sort?: string;
-    page?: number;
-    perPage?: number;
-    projectName?: string;
-    authorEmail?: string;
-    [key: string]: unknown;
-  }): Promise<CodeReviewListResponseDto> {
+  async getMyPendingReviews(
+    token: string,
+    params?: {
+      sort?: string;
+      page?: number;
+      perPage?: number;
+      projectName?: string;
+      authorEmail?: string;
+      [key: string]: unknown;
+    },
+  ): Promise<CodeReviewListResponseDto> {
     this.logger.log('Getting my pending reviews');
 
     // Transform params từ camelCase sang snake_case cho API
@@ -57,8 +62,10 @@ export class ChecklistService {
     }
 
     // Gọi API thông qua ChecklistApiService
-    const rawData =
-      await this.checklistApiService.getMyPendingReviews(apiParams);
+    const rawData = await this.checklistApiService.getMyPendingReviews(
+      token,
+      apiParams,
+    );
 
     // Transform từ snake_case sang camelCase
     const transformedData = plainToInstance(
@@ -74,19 +81,24 @@ export class ChecklistService {
 
   /**
    * Lấy danh sách code reviews với các tham số tùy chỉnh
+   * @param token Ksystem JWT token
+   * @param params Query parameters
    */
-  async getCodeReviewsToReview(params?: {
-    projectName?: string;
-    authorEmail?: string;
-    reviewerEmail?: string;
-    status?: string;
-    viewer?: string;
-    statusIn?: number | number[];
-    sort?: string;
-    page?: number;
-    perPage?: number;
-    [key: string]: unknown;
-  }): Promise<CodeReviewListResponseDto> {
+  async getCodeReviewsToReview(
+    token: string,
+    params?: {
+      projectName?: string;
+      authorEmail?: string;
+      reviewerEmail?: string;
+      status?: string;
+      viewer?: string;
+      statusIn?: number | number[];
+      sort?: string;
+      page?: number;
+      perPage?: number;
+      [key: string]: unknown;
+    },
+  ): Promise<CodeReviewListResponseDto> {
     this.logger.log('Getting code reviews to review');
 
     // Transform params từ camelCase sang snake_case cho API
@@ -119,8 +131,10 @@ export class ChecklistService {
     }
 
     // Gọi API thông qua ChecklistApiService
-    const rawData =
-      await this.checklistApiService.getCodeReviewsToReview(apiParams);
+    const rawData = await this.checklistApiService.getCodeReviewsToReview(
+      token,
+      apiParams,
+    );
 
     // Transform từ snake_case sang camelCase
     const transformedData = plainToInstance(
@@ -136,12 +150,20 @@ export class ChecklistService {
 
   /**
    * Lấy thông tin chi tiết của một code review
+   * @param token Ksystem JWT token
+   * @param id Code review ID
    */
-  async getCodeReviewDetail(id: number): Promise<CodeReviewDetailResponseDto> {
+  async getCodeReviewDetail(
+    token: string,
+    id: number,
+  ): Promise<CodeReviewDetailResponseDto> {
     this.logger.log(`Getting code review detail for id: ${id}`);
 
     // Gọi API thông qua ChecklistApiService
-    const rawData = await this.checklistApiService.getCodeReviewDetail(id);
+    const rawData = await this.checklistApiService.getCodeReviewDetail(
+      token,
+      id,
+    );
 
     // Transform từ snake_case sang camelCase
     const transformedData = plainToInstance(
@@ -157,10 +179,12 @@ export class ChecklistService {
 
   /**
    * Lấy checklist items của một code review
+   * @param token Ksystem JWT token
    * @param id - ID của code review
    * @param tagIds - Mảng các tag IDs để filter (optional)
    */
   async getCodeReviewChecklistItems(
+    token: string,
     id: number,
     tagIds?: number[],
   ): Promise<CodeReviewItemWithChecklistDto[]> {
@@ -170,6 +194,7 @@ export class ChecklistService {
 
     // Gọi API thông qua ChecklistApiService
     const rawData = await this.checklistApiService.getCodeReviewChecklistItems(
+      token,
       id,
       tagIds,
     );
@@ -186,10 +211,12 @@ export class ChecklistService {
 
   /**
    * Submit review code
+   * @param token Ksystem JWT token
    * @param id - ID của code review
    * @param payload - Payload chứa thông tin review (camelCase)
    */
   async submitReview(
+    token: string,
     id: number,
     payload: SubmitReviewPayloadDto,
   ): Promise<boolean> {
@@ -220,7 +247,11 @@ export class ChecklistService {
     };
 
     // Gọi API thông qua ChecklistApiService
-    const result = await this.checklistApiService.submitReview(id, apiPayload);
+    const result = await this.checklistApiService.submitReview(
+      token,
+      id,
+      apiPayload,
+    );
 
     // Transform response (có thể là boolean hoặc object)
     return typeof result === 'boolean' ? result : !!result;

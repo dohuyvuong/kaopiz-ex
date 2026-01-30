@@ -243,11 +243,13 @@ export function calculateApplicationsToCreate(
     return aDaysDiff - bDaysDiff;
   });
 
-  // 4. Tận dụng đơn vắng mặt (1 tuần 1 lần, tối đa 60 phút) ngay cả khi tổng chưa quá 90 phút
-  // Vì đơn này không tốn phép năm, nên luôn nên tận dụng
+  // 4. Bước 1: Kiểm tra đơn có thể được tạo (đã được lọc ở bước 2: violationsInWeek)
+
+  // Bước 2: Luôn làm tối đa 1 đơn vắng mặt (Thay đổi thời gian làm việc) nếu tuần đó có đi muộn/về sớm
   // Ưu tiên tạo cho ngày có vi phạm lớn nhất để tận dụng tối đa 60 phút
   const weekAbsenceMap = new Map<string, boolean>(); // key: ngày đầu tuần
-  let remainingMinutes = totalMinutes > maxTotalMinutes ? totalMinutes - maxTotalMinutes : 0;
+  const absenceFormByDate = new Map<string, { late: number; early: number }>(); // key: date, value: số phút đã được cover bởi đơn vắng mặt
+  const absenceFormTimeByDate = new Map<string, { timeStart: string; timeEnd: string; type: 'late' | 'early' }>(); // key: date, value: thời gian của đơn vắng mặt
 
   // Luôn tạo đơn vắng mặt nếu có vi phạm trong tuần và chưa có đơn vắng mặt
   // Ưu tiên ngày có vi phạm lớn nhất (đã được sắp xếp ở trên)
@@ -269,9 +271,41 @@ export function calculateApplicationsToCreate(
       !weekAbsenceMap.get(weekKey) &&
       !hasAbsenceFormInWeek(violation.date, calendarDays, mergedDays)
     ) {
-      if (violation.minutesLate > 0 && violation.timeIn) {
-        // Đi muộn: tạo đơn vắng mặt từ workStart đến timeIn (tối đa 60 phút)
-        const minutesToCover = Math.min(violation.minutesLate, 60);
+      // Ưu tiên tạo đơn vắng mặt cho phần vi phạm lớn nhất (đi muộn hoặc về sớm)
+      // Nhưng đơn vắng mặt do đi muộn cần điều kiện: phải về muộn ít nhất bằng số phút đi muộn (làm việc đủ ít nhất 8 tiếng)
+
+      let canCreateAbsenceForLate = false;
+      let canCreateAbsenceForEarly = false;
+      let lateMinutesToCover = 0;
+      let earlyMinutesToCover = 0;
+
+      // Kiểm tra điều kiện tạo đơn vắng mặt do đi muộn
+      if (violation.minutesLate > 0 && violation.timeIn && violation.timeOut) {
+        // Tính tổng thời gian làm việc thực tế
+        const timeInTime = dayjs(`2000-01-01 ${violation.timeIn}`, 'YYYY-MM-DD HH:mm');
+        const timeOutTime = dayjs(`2000-01-01 ${violation.timeOut}`, 'YYYY-MM-DD HH:mm');
+        const workEndTime = dayjs(`2000-01-01 ${workEnd}`, 'YYYY-MM-DD HH:mm');
+        const actualWorkMinutes = timeOutTime.diff(timeInTime, 'minute');
+        const requiredWorkMinutes = 8 * 60; // 8 tiếng = 480 phút
+
+        // Điều kiện: Tổng thời gian làm việc >= 8 tiếng HOẶC về muộn ít nhất bằng số phút đi muộn
+        const minutesLateAfterWorkEnd = timeOutTime.diff(workEndTime, 'minute');
+        if (actualWorkMinutes >= requiredWorkMinutes || minutesLateAfterWorkEnd >= violation.minutesLate) {
+          canCreateAbsenceForLate = true;
+          lateMinutesToCover = Math.min(violation.minutesLate, 60);
+        }
+      }
+
+      // Kiểm tra điều kiện tạo đơn vắng mặt do về sớm
+      if (violation.minutesEarly > 0 && violation.timeOut) {
+        canCreateAbsenceForEarly = true;
+        earlyMinutesToCover = Math.min(violation.minutesEarly, 60);
+      }
+
+      // Ưu tiên tạo đơn vắng mặt cho phần đi muộn nếu thỏa điều kiện (làm việc đủ 8 tiếng hoặc về muộn ít nhất bằng số phút đi muộn)
+      // Chỉ khi không thể tạo cho phần đi muộn, mới tạo cho phần về sớm
+      if (canCreateAbsenceForLate) {
+        // Tạo đơn vắng mặt do đi muộn (ưu tiên)
         const timeInTime = dayjs(`2000-01-01 ${violation.timeIn}`, 'YYYY-MM-DD HH:mm');
         const workStartTime = dayjs(`2000-01-01 ${workStart}`, 'YYYY-MM-DD HH:mm');
         const maxEndTime = workStartTime.add(60, 'minute');
@@ -283,21 +317,20 @@ export function calculateApplicationsToCreate(
           reasonId: 21,
           timeStart: workStart,
           timeEnd: finalEndTime.format('HH:mm'),
-          minutes: minutesToCover,
+          minutes: lateMinutesToCover,
           description: `Đi muộn ${violation.minutesLate} phút`,
         });
 
         weekAbsenceMap.set(weekKey, true);
-        // Cập nhật remainingMinutes nếu tổng > 90 phút
-        if (totalMinutes > maxTotalMinutes) {
-          remainingMinutes = Math.max(0, remainingMinutes - minutesToCover);
-        }
+        absenceFormByDate.set(violation.date, { late: lateMinutesToCover, early: 0 });
+        absenceFormTimeByDate.set(violation.date, {
+          timeStart: workStart,
+          timeEnd: finalEndTime.format('HH:mm'),
+          type: 'late',
+        });
         continue;
-      }
-
-      if (violation.minutesEarly > 0 && violation.timeOut) {
-        // Về sớm: tạo đơn vắng mặt từ timeOut đến workEnd (tối đa 60 phút)
-        const minutesToCover = Math.min(violation.minutesEarly, 60);
+      } else if (canCreateAbsenceForEarly) {
+        // Chỉ có thể tạo đơn vắng mặt do về sớm
         const timeOutTime = dayjs(`2000-01-01 ${violation.timeOut}`, 'YYYY-MM-DD HH:mm');
         const workEndTime = dayjs(`2000-01-01 ${workEnd}`, 'YYYY-MM-DD HH:mm');
         const minStartTime = workEndTime.subtract(60, 'minute');
@@ -309,67 +342,79 @@ export function calculateApplicationsToCreate(
           reasonId: 21,
           timeStart: finalStartTime.format('HH:mm'),
           timeEnd: workEnd,
-          minutes: minutesToCover,
+          minutes: earlyMinutesToCover,
           description: `Về sớm ${violation.minutesEarly} phút`,
         });
 
         weekAbsenceMap.set(weekKey, true);
-        // Cập nhật remainingMinutes nếu tổng > 90 phút
-        if (totalMinutes > maxTotalMinutes) {
-          remainingMinutes = Math.max(0, remainingMinutes - minutesToCover);
-        }
+        absenceFormByDate.set(violation.date, { late: 0, early: earlyMinutesToCover });
+        absenceFormTimeByDate.set(violation.date, {
+          timeStart: finalStartTime.format('HH:mm'),
+          timeEnd: workEnd,
+          type: 'early',
+        });
         continue;
       }
     }
   }
 
-  // 4. Nếu tổng đã ≤ maxTotalMinutes sau khi tận dụng đơn vắng mặt, không cần tạo thêm đơn nghỉ phép
-  if (totalMinutes <= maxTotalMinutes && remainingMinutes <= 0) {
-    return applications; // Trả về các đơn vắng mặt đã tạo
-  }
+  // Bước 3: Tính số phút cần làm đơn (chỉ phần vượt quá 90 phút, sau khi đã trừ đơn vắng mặt)
+  // Logic: Tận dụng tối đa 90 phút đi muộn/về sớm không cần làm đơn
+  const absenceMinutes = applications.reduce((sum, app) => {
+    return app.typeId === 2 ? sum + app.minutes : sum;
+  }, 0);
 
-  // 5. Tính số phút cần giảm thêm (chỉ phần vượt quá 90 phút, sau khi đã trừ đơn vắng mặt)
+  // Tính số phút cần làm đơn nghỉ phép: tổng - 90 phút (miễn phạt) - đơn vắng mặt đã tạo
+  let remainingMinutes = 0;
   if (totalMinutes > maxTotalMinutes) {
-    remainingMinutes = totalMinutes - maxTotalMinutes;
-    // Trừ đi các đơn vắng mặt đã tạo
-    const absenceMinutes = applications.reduce((sum, app) => {
-      return app.typeId === 2 ? sum + app.minutes : sum;
-    }, 0);
-    remainingMinutes = Math.max(0, remainingMinutes - absenceMinutes);
-  } else {
-    remainingMinutes = 0;
+    remainingMinutes = totalMinutes - maxTotalMinutes - absenceMinutes;
+    remainingMinutes = Math.max(0, remainingMinutes);
   }
 
-  // 7. Tạo đơn nghỉ phép cho phần còn lại (nếu tổng > 90 phút)
+  // Bước 4: Làm đơn xin nghỉ phép năm cho phần còn lại
   // violationsInWeek đã được sắp xếp ở bước 3, không cần sắp xếp lại
   for (const violation of violationsInWeek) {
     if (remainingMinutes <= 0) break;
 
-    // Kiểm tra đã có đơn cho ngày này chưa
+    // Kiểm tra đã có đơn cho ngày này chưa (nhưng cho phép tạo đơn nghỉ phép cho phần còn lại sau đơn vắng mặt)
     const dayTimesheet = calendarDays.find(
       (d) => dayjs(d.date).format('YYYY-MM-DD') === violation.date,
     )?.timesheet;
-    if (hasApplicationForDate(violation.date, dayTimesheet || null, mergedDays)) {
-      continue; // Đã có đơn cho ngày này, bỏ qua
+
+    // Kiểm tra xem có đơn vắng mặt cho ngày này không
+    const absenceCoveredCheck = absenceFormByDate.get(violation.date) || { late: 0, early: 0 };
+    const hasAbsenceForm = absenceCoveredCheck.late > 0 || absenceCoveredCheck.early > 0;
+
+    // Nếu không có đơn vắng mặt và đã có đơn khác, bỏ qua
+    if (!hasAbsenceForm && hasApplicationForDate(violation.date, dayTimesheet || null, mergedDays)) {
+      continue; // Đã có đơn cho ngày này (không phải đơn vắng mặt), bỏ qua
     }
 
-    // Tạo đơn nghỉ phép cho phần còn lại
-    const minutesToCover = Math.min(
-      violation.totalMinutes,
-      remainingMinutes,
-    );
+    // Tính số phút còn lại của ngày này sau khi trừ đi phần đã được cover bởi đơn vắng mặt
+    const absenceCovered = absenceFormByDate.get(violation.date) || { late: 0, early: 0 };
+    const remainingLate = Math.max(0, violation.minutesLate - absenceCovered.late);
+    const remainingEarly = Math.max(0, violation.minutesEarly - absenceCovered.early);
+    const remainingTotal = remainingLate + remainingEarly;
+
+    if (remainingTotal <= 0) continue; // Đã được cover hết bởi đơn vắng mặt
+
+    // Tính số phút cần làm đơn nghỉ phép cho ngày này (không vượt quá remainingMinutes)
+    const minutesToCover = Math.min(remainingTotal, remainingMinutes);
 
     // Nếu có chấm công, chỉ tạo đơn cho phần thiếu
     if (violation.timeIn && violation.timeOut) {
       // Có chấm công -> tạo đơn cho khoảng thiếu
-      if (violation.minutesLate > 0 && remainingMinutes > 0) {
-        // Thiếu từ workStart đến timeIn
+      if (remainingLate > 0 && remainingMinutes > 0) {
+        // Thiếu từ workStart đến timeIn (sau khi trừ đi phần đã được cover bởi đơn vắng mặt)
         const workStartTime = dayjs(`2000-01-01 ${workStart}`, 'YYYY-MM-DD HH:mm');
         const timeInTime = dayjs(`2000-01-01 ${violation.timeIn}`, 'YYYY-MM-DD HH:mm');
-        const minutesLate = Math.min(violation.minutesLate, remainingMinutes);
+        const minutesLate = Math.min(remainingLate, remainingMinutes);
 
-        // Tính timeEnd dựa trên số phút thực tế cần cover
-        const actualEndTime = workStartTime.add(minutesLate, 'minute');
+        // Tính timeStart: bắt đầu từ thời điểm kết thúc của đơn vắng mặt (nếu có)
+        const absenceEndTime = absenceCovered.late > 0
+          ? workStartTime.add(absenceCovered.late, 'minute')
+          : workStartTime;
+        const actualEndTime = absenceEndTime.add(minutesLate, 'minute');
         // Không được vượt quá timeIn
         const finalEndTime = actualEndTime.isBefore(timeInTime) ? actualEndTime : timeInTime;
 
@@ -377,7 +422,7 @@ export function calculateApplicationsToCreate(
           date: violation.date,
           typeId: 1,
           reasonId: 4,
-          timeStart: workStart,
+          timeStart: absenceEndTime.format('HH:mm'),
           timeEnd: finalEndTime.format('HH:mm'),
           minutes: minutesLate,
           description: `Nghỉ phép (đi muộn ${violation.minutesLate} phút)`,
@@ -386,23 +431,42 @@ export function calculateApplicationsToCreate(
         remainingMinutes -= minutesLate;
       }
 
-      if (violation.minutesEarly > 0 && remainingMinutes > 0) {
-        // Thiếu từ timeOut đến workEnd
+      if (remainingEarly > 0 && remainingMinutes > 0) {
+        // Thiếu từ timeOut đến workEnd (sau khi trừ đi phần đã được cover bởi đơn vắng mặt)
         const workEndTime = dayjs(`2000-01-01 ${workEnd}`, 'YYYY-MM-DD HH:mm');
         const timeOutTime = dayjs(`2000-01-01 ${violation.timeOut}`, 'YYYY-MM-DD HH:mm');
-        const minutesEarly = Math.min(violation.minutesEarly, remainingMinutes);
+        const minutesEarly = Math.min(remainingEarly, remainingMinutes);
 
-        // Tính timeStart dựa trên số phút thực tế cần cover
-        const actualStartTime = workEndTime.subtract(minutesEarly, 'minute');
-        // Không được sớm hơn timeOut
-        const finalStartTime = actualStartTime.isAfter(timeOutTime) ? actualStartTime : timeOutTime;
+        // Kiểm tra xem có đơn vắng mặt cho ngày này không
+        const absenceFormTime = absenceFormTimeByDate.get(violation.date);
+        let finalStartTime: dayjs.Dayjs;
+        let finalEndTime: dayjs.Dayjs;
+
+        if (absenceFormTime && absenceFormTime.type === 'early') {
+          // Có đơn vắng mặt về sớm, đơn nghỉ phép nên cover từ timeOut đến thời điểm bắt đầu của đơn vắng mặt
+          const absenceStartTime = dayjs(`2000-01-01 ${absenceFormTime.timeStart}`, 'YYYY-MM-DD HH:mm');
+          // Đơn nghỉ phép cover từ timeOut đến absenceStartTime
+          finalStartTime = timeOutTime;
+          finalEndTime = absenceStartTime;
+
+          // Đảm bảo không vượt quá số phút cần cover
+          const actualMinutes = finalEndTime.diff(finalStartTime, 'minute');
+          if (actualMinutes > minutesEarly) {
+            finalEndTime = finalStartTime.add(minutesEarly, 'minute');
+          }
+        } else {
+          // Không có đơn vắng mặt về sớm, tính bình thường
+          const actualStartTime = workEndTime.subtract(minutesEarly, 'minute');
+          finalStartTime = actualStartTime.isAfter(timeOutTime) ? actualStartTime : timeOutTime;
+          finalEndTime = workEndTime;
+        }
 
         applications.push({
           date: violation.date,
           typeId: 1,
           reasonId: 4,
           timeStart: finalStartTime.format('HH:mm'),
-          timeEnd: workEnd,
+          timeEnd: finalEndTime.format('HH:mm'),
           minutes: minutesEarly,
           description: `Nghỉ phép (về sớm ${violation.minutesEarly} phút)`,
         });

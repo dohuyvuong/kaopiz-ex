@@ -1,8 +1,8 @@
 'use client';
 
-import { useAppDispatch, useAppSelector } from '@/lib/hooks';
-import { clearToken } from '@/lib/features/auth/authSlice';
-import { setOpen } from '@/lib/features/sidebar/sidebarSlice';
+import { useAuthStore } from '@/lib/stores/auth-store';
+import { useSidebarStore } from '@/lib/stores/sidebar-store';
+import { authApi } from '@/lib/api/auth';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { Separator } from '@/components/ui/separator';
@@ -30,17 +30,24 @@ const AppSidebar = dynamic(
 );
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const dispatch = useAppDispatch();
   const router = useRouter();
-  const isSidebarOpen = useAppSelector((state) => state.sidebar.isOpen);
+  const isSidebarOpen = useSidebarStore((state) => state.isOpen);
+  const appRefreshToken = useAuthStore((state) => state.appRefreshToken);
 
-  const handleLogout = () => {
-    dispatch(clearToken());
+  const handleLogout = async () => {
+    if (appRefreshToken) {
+      try {
+        await authApi.logout(appRefreshToken);
+      } catch (error) {
+        console.error('Logout error:', error);
+      }
+    }
+    useAuthStore.getState().clearAuth();
     router.push('/login');
   };
 
   const handleSidebarOpenChange = (open: boolean) => {
-    dispatch(setOpen(open));
+    useSidebarStore.getState().setOpen(open);
   };
 
   return (

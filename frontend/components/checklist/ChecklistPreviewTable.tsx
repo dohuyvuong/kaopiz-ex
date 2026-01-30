@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useAppSelector } from '@/lib/hooks';
+import { useAuthStore } from '@/lib/stores/auth-store';
 import { checklistApi, CodeReview } from '@/lib/api/checklist';
 import {
   Table,
@@ -25,9 +25,7 @@ export function ChecklistPreviewTable({
   maxReviews,
   projectName,
 }: ChecklistPreviewTableProps) {
-  const ksystemToken = useAppSelector(
-    (state) => state.auth.tokens.ksystem?.token,
-  );
+  const appToken = useAuthStore((state) => state.appToken);
   const [reviews, setReviews] = useState<CodeReview[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -35,7 +33,7 @@ export function ChecklistPreviewTable({
 
   useEffect(() => {
     const fetchPreview = async () => {
-      if (!ksystemToken) {
+      if (!appToken) {
         setError('Chưa đăng nhập với Ksystem. Vui lòng đăng nhập bằng Microsoft SSO.');
         setLoading(false);
         return;
@@ -44,7 +42,7 @@ export function ChecklistPreviewTable({
       try {
         setLoading(true);
         setError(null);
-        const response = await checklistApi.getMyPendingReviews(ksystemToken, {
+        const response = await checklistApi.getMyPendingReviews({
           projectName,
           perPage: maxReviews,
           page: 1,
@@ -61,7 +59,7 @@ export function ChecklistPreviewTable({
     };
 
     fetchPreview();
-  }, [ksystemToken, maxReviews, projectName]);
+  }, [appToken, maxReviews, projectName]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('vi-VN', {

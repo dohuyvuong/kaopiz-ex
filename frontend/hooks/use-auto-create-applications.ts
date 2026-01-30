@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import dayjs from 'dayjs';
-import { useAppSelector } from '@/lib/hooks';
+import { useAuthStore } from '@/lib/stores/auth-store';
+import { useApplicationFormStore } from '@/lib/stores/application-form-store';
 import { TimesheetDay } from '@/lib/types/timesheet';
 import { applicationApi } from '@/lib/api/application';
 import {
@@ -57,10 +58,8 @@ export function useAutoCreateApplications({
   mergedDays,
   summary,
 }: UseAutoCreateApplicationsProps): UseAutoCreateApplicationsReturn {
-  const hrmToken = useAppSelector((state) => state.auth.tokens.hrm?.token);
-  const savedApprovers = useAppSelector(
-    (state) => state.applicationForm.approvers,
-  );
+  const appToken = useAuthStore((state) => state.appToken);
+  const savedApprovers = useApplicationFormStore((state) => state.approvers);
   const [applications, setApplications] = useState<ApplicationToCreate[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -159,8 +158,8 @@ export function useAutoCreateApplications({
 
   // Fetch types để kiểm tra người duyệt
   useEffect(() => {
-    if (hrmToken && applications.length > 0) {
-      applicationApi.getFormTypes(hrmToken).then((response) => {
+    if (applications.length > 0) {
+      applicationApi.getFormTypes().then((response) => {
         setTypes(response.items || []);
       }).catch(() => {
         setTypes([]);
@@ -168,10 +167,10 @@ export function useAutoCreateApplications({
     } else {
       setTypes([]);
     }
-  }, [hrmToken, applications.length]);
+  }, [appToken, applications.length]);
 
   const missingApprovers = useMemo(() => {
-    if (!hrmToken || !userId || applications.length === 0 || types.length === 0) {
+    if (!appToken || !userId || applications.length === 0 || types.length === 0) {
       return [];
     }
 
@@ -206,7 +205,7 @@ export function useAutoCreateApplications({
     }
 
     return missing;
-  }, [hrmToken, userId, applications, types, savedApprovers]);
+  }, [appToken, userId, applications, types, savedApprovers]);
 
   const calculateApplications = useCallback(() => {
     if (!workingTime) {
@@ -246,7 +245,7 @@ export function useAutoCreateApplications({
   }, []);
 
   const createApplications = useCallback(async () => {
-    if (!hrmToken) {
+    if (!appToken) {
       setError('Chưa đăng nhập với HRM. Vui lòng đăng nhập.');
       return;
     }
@@ -271,7 +270,7 @@ export function useAutoCreateApplications({
 
     try {
       // 1. Fetch types
-      const typesResponse = await applicationApi.getFormTypes(hrmToken);
+      const typesResponse = await applicationApi.getFormTypes();
       const types = typesResponse.items || [];
 
       // 2. Fetch approvers cho từng typeId (unique)
@@ -289,7 +288,6 @@ export function useAutoCreateApplications({
         for (let order = 1; order <= type.orderMax; order++) {
           const approversResponse =
             await applicationApi.getApprovalAssignments(
-              hrmToken,
               typeId,
               order,
               userId,
@@ -375,7 +373,7 @@ export function useAutoCreateApplications({
           description: app.description,
         };
 
-        await applicationApi.createApplicationForm(hrmToken, payload);
+        await applicationApi.createApplicationForm(payload);
       }
 
       // 4. Reset applications sau khi tạo thành công
@@ -399,7 +397,7 @@ export function useAutoCreateApplications({
     } finally {
       setLoading(false);
     }
-  }, [hrmToken, userId, applications, savedApprovers]);
+  }, [appToken, userId, applications, savedApprovers]);
 
   return {
     applications,

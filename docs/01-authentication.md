@@ -22,23 +22,16 @@ Hệ thống hỗ trợ 2 authentication providers:
 
 ### Token Storage
 
-Tokens được lưu trữ trong:
-- **Redux Store**: `state.auth.tokens[system]`
-- **localStorage**: Thông qua Redux Persist với key `auth`
+**Frontend** (Zustand + localStorage):
+- **Auth store**: `frontend/lib/stores/auth-store.ts`
+- **localStorage**: Persist middleware với key `auth-storage`
+- Lưu: `appToken`, `appRefreshToken`, `expiresIn`, `user`, `systems`
 
-Cấu trúc token:
+**Backend** (Database):
+- System tokens (Ksystem, HRM) lưu trong bảng `SystemToken` (Prisma)
+- App JWT do backend ký; refresh token lưu trong `AppRefreshToken`
 
-```typescript
-interface TokenInfo {
-  token: string;
-  system: SystemName; // 'ksystem' | 'hrm'
-  provider: string; // 'microsoft-sso' | 'ksystem-oauth'
-  userInfo?: CommonUserInfo | HrmUserInfoResponse;
-  expiresAt?: number; // Timestamp (milliseconds)
-}
-```
-
-Code reference: `frontend/lib/features/auth/authSlice.ts:5-11`
+Code reference: `frontend/lib/stores/auth-store.ts`
 
 ## Authentication Flow
 
@@ -47,7 +40,7 @@ Code reference: `frontend/lib/features/auth/authSlice.ts:5-11`
 ```
 User → Login Page → Select Provider → Get Auth URL →
 Open URL → Login → Copy Callback URL → Exchange Token →
-Save to Redux + localStorage → Redirect to Home
+Save to Zustand + localStorage → Redirect to Home
 ```
 
 ### Chi tiết từng bước
@@ -205,61 +198,46 @@ Code reference: `backend/src/auth/providers/ksystem-oauth.provider.ts:54-106`
 
 #### 5. Lưu Token vào Redux và localStorage
 
-**File**: `frontend/lib/features/auth/authSlice.ts`
+**File**: `frontend/lib/stores/auth-store.ts`
 
-**Action**: `setToken`
-
-```typescript
-dispatch(
-  setToken({
-    token: response.token,
-    system: response.system || 'ksystem',
-    provider: response.provider || selectedProvider,
-    userInfo: response.userInfo,
-    expiresAt: response.expiresAt,
-  })
-);
-```
-
-Code reference: `frontend/components/auth/LoginPageContent.tsx:126-134`
-
-Redux Persist tự động lưu vào localStorage với key `auth`.
-
-**Redux Slice**:
+**Action**: `setAuth`
 
 ```typescript
-const authSlice = createSlice({
-  name: 'auth',
-  initialState,
-  reducers: {
-    setToken: (state, action: PayloadAction<{...}>) => {
-      const { token, system, provider, userInfo, expiresAt } = action.payload;
-      state.tokens[system as keyof typeof state.tokens] = {
-        token,
-        system,
-        provider,
-        userInfo,
-        expiresAt,
-      };
-    },
-    clearToken: (state, action: PayloadAction<SystemName | undefined>) => {
-      if (action.payload) {
-        delete state.tokens[action.payload as keyof typeof state.tokens];
-      } else {
-        state.tokens = {};
-      }
-    },
-  },
+setAuth({
+  appToken: response.appToken,
+  appRefreshToken: response.appRefreshToken,
+  expiresIn: response.expiresIn,
+  user: response.user,
+  systems: response.systems,
 });
 ```
 
-Code reference: `frontend/lib/features/auth/authSlice.ts:26-62`
+Code reference: `frontend/components/auth/LoginPageContent.tsx`
+
+Zustand persist middleware tự động lưu vào localStorage với key `auth-storage`.
 
 #### 6. Redirect về Dashboard
 
 Sau khi lưu token thành công, redirect về `/dashboard`.
 
 Code reference: `frontend/components/auth/LoginPageContent.tsx:137`
+
+## Backend Auth Guard
+
+Backend dùng **AppJwtAuthGuard** duy nhất để bảo vệ route: verify App JWT, lấy system token từ DB, gắn vào request.
+
+**File**: `backend/src/auth/guards/app-jwt-auth.guard.ts`
+
+**Decorator**: `@Auth('ksystem')` hoặc `@Auth('hrm')` — vừa set metadata vừa gắn guard.
+
+**Request sau khi qua guard** (type `AuthenticatedRequest`):
+- `request.user`: `{ id: number, email: string }` (từ JWT payload)
+- `request.token`: system token (Ksystem hoặc HRM) lấy từ DB
+- `request.system`: `'ksystem'` | `'hrm'`
+
+**Type**: `backend/src/common/types/request.types.ts` — `AuthenticatedRequest` extends Express Request với `user`, `token`, `system`.
+
+Controller dùng `@Token()` để lấy system token: `@Token() token: string`.
 
 ## Protected Routes
 
@@ -272,7 +250,7 @@ Component này bảo vệ routes bằng cách kiểm tra token cho system cụ t
 **Logic**:
 
 1. Xác định system requirement từ pathname hoặc prop
-2. Kiểm tra token trong Redux store
+2. Kiểm tra token trong Zustand auth store
 3. Nếu không có token, redirect về `/login` với error message
 4. Nếu có token, render children
 
@@ -285,7 +263,8 @@ export function SystemProtectedRoute({
 }: SystemProtectedRouteProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { tokens } = useAppSelector((state) => state.auth);
+  const user = useAuthStore((state) => state.user);
+  const systems = useAuthStore((state) => state.systems);
 
   // Xác định system requirement
   const requiredSystem = useMemo(
@@ -293,13 +272,11 @@ export function SystemProtectedRoute({
     [system, pathname],
   );
 
-  // Kiểm tra token
+  // Kiểm tra đã đăng nhập system tương ứng chưa
   const hasToken = useMemo(() => {
-    if (!requiredSystem) {
-      return true; // Public route
-    }
-    return !!(tokens[requiredSystem.name]?.token);
-  }, [tokens, requiredSystem]);
+    if (!requiredSystem) return true;
+    return systems.includes(requiredSystem.name);
+  }, [systems, requiredSystem]);
 
   useEffect(() => {
     if (!requiredSystem) return;

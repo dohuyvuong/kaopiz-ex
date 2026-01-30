@@ -11,6 +11,7 @@ import { ChecklistService } from './checklist.service';
 import { AutoReviewQueryDto } from './dto/auto-review.dto';
 import { GetPendingReviewsQueryDto } from './dto/get-pending-reviews.dto';
 import { Auth } from '../auth/decorators';
+import { Token } from '../auth/decorators/token.decorator';
 
 @Controller('checklist')
 @Auth('ksystem')
@@ -26,8 +27,12 @@ export class ChecklistController {
    * Yêu cầu: Authorization header với Bearer token
    */
   @Post('auto-review')
-  async autoReviewAll(@Query() query: AutoReviewQueryDto) {
+  async autoReviewAll(
+    @Token() token: string,
+    @Query() query: AutoReviewQueryDto,
+  ) {
     const result = await this.autoReviewService.autoReviewAll(
+      token,
       query.maxReviews,
       query.projectName,
     );
@@ -43,8 +48,11 @@ export class ChecklistController {
    * Tự động review một code review cụ thể
    */
   @Post('auto-review/:id')
-  async autoReviewSingle(@Param('id', ParseIntPipe) id: number) {
-    const success = await this.autoReviewService.autoReviewSingle(id);
+  async autoReviewSingle(
+    @Token() token: string,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    const success = await this.autoReviewService.autoReviewSingle(token, id);
     return {
       success,
       message: success ? 'Đã review thành công' : 'Review không thành công',
@@ -60,8 +68,11 @@ export class ChecklistController {
    * Yêu cầu: Authorization header với Bearer token
    */
   @Get('pending-reviews')
-  async getPendingReviews(@Query() query: GetPendingReviewsQueryDto) {
-    const result = await this.checklistService.getMyPendingReviews({
+  async getPendingReviews(
+    @Token() token: string,
+    @Query() query: GetPendingReviewsQueryDto,
+  ) {
+    const result = await this.checklistService.getMyPendingReviews(token, {
       sort: query.sort,
       page: query.page,
       perPage: query.perPage,

@@ -6,6 +6,19 @@ Hệ thống tích hợp với 2 API systems:
 - **Ksystem API**: Cho checklist review
 - **HRM API**: Cho timesheet và application forms
 
+## Frontend API Client (Axios)
+
+**File**: `frontend/lib/api/client.ts`
+
+Tất cả API (checklist, application, timesheet) gọi qua một axios instance:
+
+- **Request interceptor**: Tự động gắn `Authorization: Bearer <appToken>` (lấy từ Zustand auth store). Bỏ qua với các endpoint `/auth/`.
+- **Response interceptor**: Gặp 401 → gọi `authApi.refreshToken()` với `appRefreshToken` → cập nhật `appToken` trong store → retry request. Nếu refresh thất bại → clear auth và redirect `/login`. Có queue để tránh nhiều lần refresh đồng thời.
+
+**Auth API** (`frontend/lib/api/auth.ts`) dùng **fetch** thay vì axios để tránh loop (không cần gắn token cho login/refresh).
+
+Hooks và components **không truyền token** thủ công; client tự lấy từ store và xử lý refresh.
+
 ## API Base URL
 
 **Environment Variable**: `NEXT_PUBLIC_API_BASE_URL`
@@ -18,16 +31,13 @@ Hệ thống tích hợp với 2 API systems:
 
 ### Headers
 
-Tất cả API calls yêu cầu Authorization header:
+Tất cả API calls (qua axios client) tự động có Authorization header do request interceptor gắn:
 
 ```typescript
-headers: {
-  'Content-Type': 'application/json',
-  Authorization: `Bearer ${token}`,
-}
+Authorization: `Bearer ${appToken}`
 ```
 
-**Code reference**: `frontend/lib/api/timesheet.ts:22-24`
+Token lấy từ Zustand auth store; không cần truyền tham số token trong từng lần gọi.
 
 ## Timesheet API
 
@@ -176,27 +186,8 @@ interface ApplicationForm {
 
 ## Error Handling
 
-### Pattern
-
-Tất cả API functions sử dụng pattern:
-
-```typescript
-try {
-  const response = await fetch(url, options);
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({
-      message: 'Failed to...',
-    }));
-    throw new Error(error.message || 'Failed to...');
-  }
-  const result = await response.json();
-  return result.data;
-} catch (error) {
-  throw error;
-}
-```
-
-**Code reference**: `frontend/lib/api/timesheet.ts:28-33`
+- **401**: Axios client tự xử lý refresh token và retry; nếu refresh fail thì clear auth và redirect login.
+- **Các lỗi khác**: API modules throw error; component/hook bắt và hiển thị (toast, message).
 
 ## Backend API Endpoints
 

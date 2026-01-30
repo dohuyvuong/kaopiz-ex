@@ -1,6 +1,6 @@
 import { SystemName } from '@/lib/types/system';
-import { CommonUserInfo, HrmUserInfoResponse } from '@/lib/types/userInfo';
 
+// Note: Auth API uses native fetch instead of apiClient to avoid interceptor loops
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
 
 export interface Provider {
@@ -17,13 +17,24 @@ export interface AuthorizeResponse {
   instructions: string[];
 }
 
+export interface AppUser {
+  id: number;
+  email: string;
+  name?: string | null;
+}
+
 export interface ExchangeTokenResponse {
-  token: string;
-  system?: SystemName;
-  provider?: string;
-  userInfo?: CommonUserInfo | HrmUserInfoResponse;
-  expiresAt?: number;
-  note: string;
+  appToken: string;
+  appRefreshToken: string;
+  expiresIn: number;
+  user: AppUser;
+  systems: SystemName[];
+}
+
+export interface RefreshTokenResponse {
+  appToken: string;
+  expiresIn: number;
+  appRefreshToken?: string;
 }
 
 export interface ExchangeTokenRequest {
@@ -113,5 +124,50 @@ export const authApi = {
 
     const result = await response.json();
     return result.data;
+  },
+
+  /**
+   * Refresh app JWT token using refresh token
+   */
+  async refreshToken(
+    appRefreshToken: string,
+  ): Promise<RefreshTokenResponse> {
+    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ appRefreshToken }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({
+        message: 'Failed to refresh token',
+      }));
+      throw new Error(error.message || 'Failed to refresh token');
+    }
+
+    const result = await response.json();
+    return result.data;
+  },
+
+  /**
+   * Logout and revoke refresh token
+   */
+  async logout(appRefreshToken: string): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/auth/logout`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ appRefreshToken }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({
+        message: 'Failed to logout',
+      }));
+      throw new Error(error.message || 'Failed to logout');
+    }
   },
 };

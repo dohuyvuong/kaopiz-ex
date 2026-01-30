@@ -25,8 +25,8 @@ KaopizEX là hệ thống công cụ nội bộ của Kaopiz, được xây dự
 │         │                         │                           │
 │         ▼                         ▼                           │
 │  ┌──────────────┐         ┌──────────────┐                  │
-│  │   Redux     │         │   Ksystem    │                  │
-│  │   Store     │         │     API      │                  │
+│  │   Zustand   │         │   Ksystem    │                  │
+│  │   Stores    │         │     API      │                  │
 │  └──────────────┘         └──────────────┘                  │
 │         │                         │                           │
 │         │                         ▼                           │
@@ -38,7 +38,8 @@ KaopizEX là hệ thống công cụ nội bộ của Kaopiz, được xây dự
 │         ▼                                                   │
 │  ┌──────────────┐                                          │
 │  │ localStorage │                                          │
-│  │  (Persist)   │                                          │
+│  │ (Zustand    │                                          │
+│  │  persist)   │                                          │
 │  └──────────────┘                                          │
 │                                                               │
 └─────────────────────────────────────────────────────────────┘
@@ -48,7 +49,7 @@ KaopizEX là hệ thống công cụ nội bộ của Kaopiz, được xây dự
 
 - **Framework**: Next.js 16.0.1 với App Router
 - **UI Library**: Shadcn UI (Radix UI + Tailwind CSS)
-- **State Management**: Redux Toolkit với Redux Persist
+- **State Management**: Zustand với persist middleware
 - **Date/Time**: dayjs với plugins (utc, timezone)
 - **Notifications**: Sonner (toast notifications)
 
@@ -67,11 +68,9 @@ KaopizEX là hệ thống công cụ nội bộ của Kaopiz, được xây dự
 {
   "next": "16.0.1",
   "react": "19.2.0",
-  "@reduxjs/toolkit": "^2.10.1",
-  "redux-persist": "^6.0.0",
+  "zustand": "^5.0.10",
   "dayjs": "^1.11.19",
-  "sonner": "^2.0.7",
-  "next-themes": "^0.4.6"
+  "sonner": "^2.0.7"
 }
 ```
 
@@ -108,13 +107,15 @@ frontend/
 │   ├── use-timesheet-calendar.ts
 │   └── use-timesheet-day-detail.ts
 ├── lib/                          # Utilities và configurations
-│   ├── api/                      # API service functions
+│   ├── api/                      # API client + service functions
+│   │   ├── client.ts             # Axios client (auto token, refresh)
 │   │   ├── application.ts
-│   │   └── timesheet.ts
-│   ├── features/                 # Redux slices
-│   │   ├── auth/
-│   │   └── application-form/
-│   ├── store.ts                  # Redux store configuration
+│   │   ├── timesheet.ts
+│   │   └── checklist.ts
+│   ├── stores/                   # Zustand stores
+│   │   ├── auth-store.ts
+│   │   ├── application-form-store.ts
+│   │   └── sidebar-store.ts
 │   ├── types/                    # TypeScript types
 │   └── utils/                    # Utility functions
 │       ├── application-form.ts
@@ -160,7 +161,7 @@ backend/
 ```
 User → Login Page → Select Provider → Get Auth URL →
 Open URL → Login → Copy Callback URL → Exchange Token →
-Save to Redux + localStorage → Redirect to Home
+Save to Zustand + localStorage → Redirect to Home
 ```
 
 Chi tiết: [01-authentication.md](./01-authentication.md)
@@ -199,29 +200,11 @@ Chi tiết: [05-auto-create-applications.md](./05-auto-create-applications.md)
 
 ## State Management
 
-### Redux Store Structure
+### Zustand Stores
 
-```typescript
-{
-  auth: {
-    tokens: {
-      ksystem?: TokenInfo,
-      hrm?: TokenInfo
-    },
-    isLoading: boolean
-  },
-  applicationForm: {
-    approvers: {
-      [typeId]: {
-        [order]: userId | null
-      }
-    }
-  },
-  sidebar: {
-    // Sidebar state
-  }
-}
-```
+- **auth-store**: appToken, appRefreshToken, user, systems, isLoading
+- **application-form-store**: approvers (theo typeId, order)
+- **sidebar-store**: isOpen
 
 Chi tiết: [08-state-management.md](./08-state-management.md)
 
@@ -260,6 +243,8 @@ Chi tiết: [10-api-integration.md](./10-api-integration.md)
 9. [08-state-management.md](./08-state-management.md) - State Management
 10. [09-ui-components.md](./09-ui-components.md) - UI Components
 11. [10-api-integration.md](./10-api-integration.md) - API Integration
+
+Phần chưa triển khai (background automation: cron auto-review, auto-create forms) xem **BACKGROUND_AUTOMATION_PLAN.md** ở root project.
 
 ## Development Setup
 

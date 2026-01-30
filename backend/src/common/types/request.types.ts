@@ -2,18 +2,26 @@ import { Request } from 'express';
 import { SystemName } from './system.types';
 
 /**
- * Request với JWT token đã được validate bởi JwtAuthSystemGuard
- * Token được lưu vào request sau khi Guard validate thành công
+ * Request với authentication info đã được validate bởi AppJwtAuthGuard
+ * User, token, và system được set sau khi Guard validate thành công
  */
 export interface AuthenticatedRequest extends Request {
   /**
-   * JWT token đã được validate
-   * Được set bởi JwtAuthSystemGuard sau khi validate thành công
+   * User info từ App JWT payload
+   * Được set bởi AppJwtAuthGuard sau khi verify App JWT
+   */
+  user: {
+    id: number;
+    email: string;
+  };
+  /**
+   * System token (Ksystem hoặc HRM token) đã được validate
+   * Được set bởi AppJwtAuthGuard từ database
    */
   token: string;
   /**
    * Hệ thống mà token này dùng cho ('ksystem' | 'hrm')
-   * Được set bởi JwtAuthSystemGuard
+   * Được set bởi AppJwtAuthGuard từ @Auth() decorator
    */
-  system?: SystemName;
+  system: SystemName;
 }

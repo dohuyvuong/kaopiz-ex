@@ -15,53 +15,24 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { useAppSelector } from "@/lib/hooks"
-import { CommonUserInfo, HrmUserInfoResponse } from "@/lib/types/userInfo"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { useAuthStore } from "@/lib/stores/auth-store"
 import { useIsMobile } from "@/hooks/use-mobile"
 
 interface NavUserProps {
   onLogout?: () => void
 }
 
-// Helper function để extract CommonUserInfo từ userInfo
-function extractUserInfo(
-  userInfo: CommonUserInfo | HrmUserInfoResponse | undefined,
-): CommonUserInfo | null {
-  if (!userInfo) return null;
-  // HRM wrap userInfo trong object có key "info"
-  if ('info' in userInfo) {
-    return userInfo.info;
-  }
-  // Ksystem trả về trực tiếp CommonUserInfo
-  return userInfo as CommonUserInfo;
-}
-
-// Helper function để lấy user info từ tokens (ưu tiên ksystem, sau đó hrm)
-function getUserInfoFromTokens(tokens: {
-  ksystem?: { userInfo?: CommonUserInfo | HrmUserInfoResponse };
-  hrm?: { userInfo?: CommonUserInfo | HrmUserInfoResponse };
-}): CommonUserInfo | null {
-  const ksystemUserInfo = extractUserInfo(tokens.ksystem?.userInfo);
-  if (ksystemUserInfo) return ksystemUserInfo;
-
-  const hrmUserInfo = extractUserInfo(tokens.hrm?.userInfo);
-  if (hrmUserInfo) return hrmUserInfo;
-
-  return null;
-}
-
 export function NavUser({ onLogout }: NavUserProps) {
   const router = useRouter()
-  const { tokens } = useAppSelector((state) => state.auth)
-  const userInfo = getUserInfoFromTokens(tokens)
+  const user = useAuthStore((state) => state.user)
   const isMobile = useIsMobile()
 
-  // Kiểm tra xem có đăng nhập hay không (có ít nhất một token)
-  const isLoggedIn = !!(tokens.ksystem || tokens.hrm)
+  // Kiểm tra xem có đăng nhập hay không
+  const isLoggedIn = !!user
 
-  const displayName = userInfo?.name || "User"
-  const displayEmail = userInfo?.email || ""
+  const displayName = user?.name || user?.email || "User"
+  const displayEmail = user?.email || ""
   const initials = displayName
     .split(" ")
     .map((n) => n[0])
@@ -87,7 +58,6 @@ export function NavUser({ onLogout }: NavUserProps) {
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
               <Avatar className="h-8 w-8 rounded-lg">
-                <AvatarImage src={userInfo?.user_profile?.avatar || undefined} alt={displayName} />
                 <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
@@ -106,7 +76,6 @@ export function NavUser({ onLogout }: NavUserProps) {
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                 <Avatar className="h-8 w-8 rounded-lg">
-                  <AvatarImage src={userInfo?.user_profile?.avatar || undefined} alt={displayName} />
                   <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">

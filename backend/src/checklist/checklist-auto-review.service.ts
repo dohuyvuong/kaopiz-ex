@@ -18,10 +18,12 @@ export class ChecklistAutoReviewService {
 
   /**
    * Tự động review tất cả các checklist đang chờ review
+   * @param token Ksystem JWT token
    * @param maxReviews - Số lượng checklist tối đa sẽ review (optional)
    * @param projectName - Tên project để lọc checklist (optional, API sẽ search like)
    */
   async autoReviewAll(
+    token: string,
     maxReviews?: number,
     projectName?: string,
   ): Promise<{
@@ -55,11 +57,14 @@ export class ChecklistAutoReviewService {
     // Lấy tất cả các trang
     while (hasMore) {
       try {
-        const response = await this.checklistService.getMyPendingReviews({
-          page: currentPage,
-          perPage: 20,
-          projectName: projectName,
-        });
+        const response = await this.checklistService.getMyPendingReviews(
+          token,
+          {
+            page: currentPage,
+            perPage: 20,
+            projectName: projectName,
+          },
+        );
 
         // Filter chỉ lấy những review có status = 3 (Đã self reviewed)
         const reviewsToProcess = response.data.filter(
@@ -82,7 +87,7 @@ export class ChecklistAutoReviewService {
           }
 
           try {
-            await this.autoReviewSingle(review.id);
+            await this.autoReviewSingle(token, review.id);
             results.push({
               codeReviewId: review.id,
               success: true,
@@ -139,13 +144,18 @@ export class ChecklistAutoReviewService {
 
   /**
    * Tự động review một code review cụ thể
+   * @param token Ksystem JWT token
+   * @param codeReviewId Code review ID
    */
-  async autoReviewSingle(codeReviewId: number): Promise<boolean> {
+  async autoReviewSingle(
+    token: string,
+    codeReviewId: number,
+  ): Promise<boolean> {
     this.logger.log(`Bắt đầu review code review ${codeReviewId}...`);
 
     // 1. Lấy chi tiết code review
     const detail: CodeReviewDetailResponseDto =
-      await this.checklistService.getCodeReviewDetail(codeReviewId);
+      await this.checklistService.getCodeReviewDetail(token, codeReviewId);
 
     // Kiểm tra status = 3
     if (detail.status !== 3) {
@@ -163,6 +173,7 @@ export class ChecklistAutoReviewService {
     // 3. Lấy checklist items với tags
     const checklistItems: CodeReviewItemWithChecklistDto[] =
       await this.checklistService.getCodeReviewChecklistItems(
+        token,
         codeReviewId,
         tagIds.length > 0 ? tagIds : undefined,
       );
@@ -187,6 +198,7 @@ export class ChecklistAutoReviewService {
 
     // 5. Submit review
     const result = await this.checklistService.submitReview(
+      token,
       codeReviewId,
       payload,
     );

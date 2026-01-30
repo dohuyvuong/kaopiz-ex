@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { useAppSelector } from '@/lib/hooks';
+import { useAuthStore } from '@/lib/stores/auth-store';
 import { getSystemRequirementForPathname, type SystemRequirement } from '@/lib/navigation';
 
 interface SystemProtectedRouteProps {
@@ -16,7 +16,7 @@ export function SystemProtectedRoute({
 }: SystemProtectedRouteProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { tokens } = useAppSelector((state) => state.auth);
+  const systems = useAuthStore((state) => state.systems);
 
   // Xác định system requirement
   const requiredSystem = useMemo(
@@ -29,8 +29,8 @@ export function SystemProtectedRoute({
     if (!requiredSystem) {
       return true; // Public route - không cần token
     }
-    return !!(tokens[requiredSystem.name]?.token);
-  }, [tokens, requiredSystem]);
+    return systems.includes(requiredSystem.name);
+  }, [systems, requiredSystem]);
 
   useEffect(() => {
     // Nếu không có system requirement (public route), không cần kiểm tra

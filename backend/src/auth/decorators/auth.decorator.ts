@@ -1,15 +1,16 @@
-import { applyDecorators, UseGuards } from '@nestjs/common';
-import { JwtAuthSystemGuard } from '../guards/jwt-auth-system.guard';
-import { System } from './system.decorator';
+import { applyDecorators, UseGuards, SetMetadata } from '@nestjs/common';
+import { AppJwtAuthGuard } from '../guards/app-jwt-auth.guard';
 import { SystemName } from '../../common/types/system.types';
 
+export const AUTH_SYSTEM_KEY = 'auth:system';
+
 /**
- * Decorator để tự động apply JwtAuthSystemGuard
+ * Decorator để tự động apply AppJwtAuthGuard
  *
  * Sử dụng:
  * @Controller('example')
- * @Auth('ksystem')  // Ksystem token
- * @Auth('hrm')  // HRM token
+ * @Auth('ksystem')  // App JWT + resolve ksystem token
+ * @Auth('hrm')  // App JWT + resolve HRM token
  * export class ExampleController {
  *   @Get()
  *   async getData() {
@@ -28,5 +29,8 @@ import { SystemName } from '../../common/types/system.types';
  * }
  */
 export function Auth(system: SystemName) {
-  return applyDecorators(System(system), UseGuards(JwtAuthSystemGuard));
+  return applyDecorators(
+    SetMetadata(AUTH_SYSTEM_KEY, system),
+    UseGuards(AppJwtAuthGuard),
+  );
 }

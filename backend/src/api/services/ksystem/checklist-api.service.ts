@@ -1,6 +1,4 @@
-import { Injectable, Inject } from '@nestjs/common';
-import { REQUEST } from '@nestjs/core';
-import { AuthenticatedRequest } from '../../../common/types/request.types';
+import { Injectable } from '@nestjs/common';
 import { KsystemService } from '../ksystem.service';
 
 // Code Review interfaces
@@ -238,31 +236,26 @@ export interface SubmitReviewPayload {
 
 @Injectable()
 export class ChecklistApiService {
-  constructor(
-    private readonly ksystemService: KsystemService,
-    @Inject(REQUEST) private readonly request: AuthenticatedRequest,
-  ) {}
-
-  /**
-   * Lấy token từ request (đã được validate bởi JwtAuthSystemGuard)
-   */
-  private getToken(): string {
-    return this.request.token;
-  }
+  constructor(private readonly ksystemService: KsystemService) {}
 
   /**
    * Lấy danh sách code reviews đang chờ tôi review từ Ksystem API
    * Sử dụng các tham số cố định: viewer=is_reviewer&status_in=3
+   * @param token Ksystem JWT token
+   * @param params Query parameters
    * @returns Raw data từ Ksystem API (snake_case)
    */
-  async getMyPendingReviews(params?: {
-    sort?: string;
-    page?: number;
-    per_page?: number;
-    project_name?: string;
-    author_email?: string;
-    [key: string]: unknown;
-  }): Promise<unknown> {
+  async getMyPendingReviews(
+    token: string,
+    params?: {
+      sort?: string;
+      page?: number;
+      per_page?: number;
+      project_name?: string;
+      author_email?: string;
+      [key: string]: unknown;
+    },
+  ): Promise<unknown> {
     const queryParams = new URLSearchParams();
 
     // Tham số cố định
@@ -284,17 +277,17 @@ export class ChecklistApiService {
     }
 
     const endpoint = `/code-reviews?${queryParams.toString()}`;
-    return this.ksystemService.get<CodeReviewListResponse>(
-      endpoint,
-      this.getToken(),
-    );
+    return this.ksystemService.get<CodeReviewListResponse>(endpoint, token);
   }
 
   /**
    * Lấy danh sách code reviews với các tham số tùy chỉnh từ Ksystem API
+   * @param token Ksystem JWT token
+   * @param params Query parameters
    * @returns Raw data từ Ksystem API (snake_case)
    */
   async getCodeReviewsToReview(
+    token: string,
     params?: GetCodeReviewsParams,
   ): Promise<unknown> {
     const queryParams = new URLSearchParams();
@@ -312,35 +305,33 @@ export class ChecklistApiService {
     }
 
     const endpoint = `/code-reviews${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-    return this.ksystemService.get<CodeReviewListResponse>(
-      endpoint,
-      this.getToken(),
-    );
+    return this.ksystemService.get<CodeReviewListResponse>(endpoint, token);
   }
 
   /**
    * Lấy thông tin chi tiết của một code review từ Ksystem API
+   * @param token Ksystem JWT token
+   * @param id Code review ID
    * @returns Raw data từ Ksystem API (snake_case)
    */
-  async getCodeReviewDetail(id: number): Promise<unknown> {
+  async getCodeReviewDetail(token: string, id: number): Promise<unknown> {
     const queryParams = new URLSearchParams();
     queryParams.append('id', String(id));
     queryParams.append('detail', 'true');
 
     const endpoint = `/code-reviews/${id}?${queryParams.toString()}`;
-    return this.ksystemService.get<CodeReviewDetailResponse>(
-      endpoint,
-      this.getToken(),
-    );
+    return this.ksystemService.get<CodeReviewDetailResponse>(endpoint, token);
   }
 
   /**
    * Lấy checklist items của một code review từ Ksystem API
+   * @param token Ksystem JWT token
    * @param id - ID của code review
    * @param tagIds - Mảng các tag IDs để filter (optional)
    * @returns Raw data từ Ksystem API (snake_case)
    */
   async getCodeReviewChecklistItems(
+    token: string,
     id: number,
     tagIds?: number[],
   ): Promise<unknown> {
@@ -356,22 +347,23 @@ export class ChecklistApiService {
     const endpoint = `/code-reviews/${id}/review${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     return this.ksystemService.get<CodeReviewItemWithChecklist[]>(
       endpoint,
-      this.getToken(),
+      token,
     );
   }
 
   /**
    * Submit review code từ Ksystem API
+   * @param token Ksystem JWT token
    * @param id - ID của code review
    * @param payload - Payload chứa thông tin review (snake_case)
    * @returns Raw response từ Ksystem API
    */
-  async submitReview(id: number, payload: unknown): Promise<unknown> {
+  async submitReview(
+    token: string,
+    id: number,
+    payload: unknown,
+  ): Promise<unknown> {
     const endpoint = `/code-reviews/${id}/review`;
-    return this.ksystemService.post<boolean>(
-      endpoint,
-      this.getToken(),
-      payload,
-    );
+    return this.ksystemService.post<boolean>(endpoint, token, payload);
   }
 }

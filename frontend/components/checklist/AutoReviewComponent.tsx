@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useAppSelector } from '@/lib/hooks';
+import { useAuthStore } from '@/lib/stores/auth-store';
 import { checklistApi } from '@/lib/api/checklist';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,9 +11,7 @@ import { ChecklistPreviewTable } from './ChecklistPreviewTable';
 import { Play, Eye } from 'lucide-react';
 
 export function AutoReviewComponent() {
-  const ksystemToken = useAppSelector(
-    (state) => state.auth.tokens.ksystem?.token,
-  );
+  const appToken = useAuthStore((state) => state.appToken);
   const [maxReviews, setMaxReviews] = useState<number>(10);
   const [projectName, setProjectName] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -27,7 +25,7 @@ export function AutoReviewComponent() {
   } | null>(null);
 
   const handleAutoReview = async () => {
-    if (!ksystemToken) {
+    if (!appToken) {
       setError('Chưa đăng nhập với Ksystem. Vui lòng đăng nhập bằng Microsoft SSO.');
       return;
     }
@@ -47,7 +45,7 @@ export function AutoReviewComponent() {
       setError(null);
       setSuccess(null);
 
-      const result = await checklistApi.autoReview(ksystemToken, {
+      const result = await checklistApi.autoReview({
         maxReviews,
         projectName: projectName.trim(),
       });
@@ -63,7 +61,7 @@ export function AutoReviewComponent() {
   };
 
   const handlePreview = async () => {
-    if (!ksystemToken) {
+    if (!appToken) {
       setError('Chưa đăng nhập với Ksystem. Vui lòng đăng nhập bằng Microsoft SSO.');
       return;
     }

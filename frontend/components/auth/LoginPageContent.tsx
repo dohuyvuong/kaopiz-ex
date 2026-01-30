@@ -20,14 +20,13 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { authApi, type Provider } from '@/lib/api/auth';
-import { useAppDispatch, useAppSelector } from '@/lib/hooks';
-import { setToken, setLoading } from '@/lib/features/auth/authSlice';
+import { useAuthStore } from '@/lib/stores/auth-store';
 import { SYSTEMS } from '@/lib/types/system';
 
 export function LoginPageContent() {
   const router = useRouter();
-  const dispatch = useAppDispatch();
-  const { tokens } = useAppSelector((state) => state.auth);
+  const user = useAuthStore((state) => state.user);
+  const systems = useAuthStore((state) => state.systems);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [selectedProvider, setSelectedProvider] = useState<string>('');
   const [authUrl, setAuthUrl] = useState<string>('');
@@ -116,22 +115,20 @@ export function LoginPageContent() {
     try {
       setIsLoading(true);
       setError('');
-      dispatch(setLoading(true));
+      useAuthStore.getState().setLoading(true);
 
       const response = await authApi.exchangeToken(selectedProvider, {
         url: callbackUrl,
       });
 
-      // Lưu token với system và provider info
-      dispatch(
-        setToken({
-          token: response.token,
-          system: response.system || 'ksystem',
-          provider: response.provider || selectedProvider,
-          userInfo: response.userInfo,
-          expiresAt: response.expiresAt,
-        }),
-      );
+      // Lưu appToken, appRefreshToken, user và systems
+      useAuthStore.getState().setAuth({
+        appToken: response.appToken,
+        appRefreshToken: response.appRefreshToken,
+        expiresIn: response.expiresIn,
+        user: response.user,
+        systems: response.systems,
+      });
 
       // Redirect về dashboard
       router.push('/dashboard');
@@ -139,7 +136,7 @@ export function LoginPageContent() {
       setError(err instanceof Error ? err.message : 'Failed to exchange token');
     } finally {
       setIsLoading(false);
-      dispatch(setLoading(false));
+      useAuthStore.getState().setLoading(false);
     }
   };
 
@@ -162,21 +159,23 @@ export function LoginPageContent() {
           )}
 
           {/* Hiển thị trạng thái đăng nhập */}
-          {Object.keys(tokens).length > 0 && (
+          {user && systems.length > 0 && (
             <div className="p-3 text-sm bg-green-50 border border-green-200 rounded-md">
               <p className="font-medium text-green-800">Đã đăng nhập:</p>
+              <p className="text-green-700 mt-1">
+                User: {user.email} {user.name && `(${user.name})`}
+              </p>
               <ul className="mt-1 space-y-1">
-                {Object.values(tokens).map((tokenInfo) => {
+                {systems.map((system) => {
                   const systemInfo =
-                    tokenInfo.system === 'ksystem'
+                    system === 'ksystem'
                       ? SYSTEMS.KSYSTEM
-                      : tokenInfo.system === 'hrm'
+                      : system === 'hrm'
                         ? SYSTEMS.HRM
                         : null;
                   return (
-                    <li key={tokenInfo.system} className="text-green-700">
-                      • {systemInfo?.displayName || tokenInfo.system} (
-                      {tokenInfo.provider})
+                    <li key={system} className="text-green-700">
+                      • {systemInfo?.displayName || system}
                     </li>
                   );
                 })}

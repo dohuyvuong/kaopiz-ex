@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
-import { useAppSelector } from '@/lib/hooks';
 import { timesheetApi } from '@/lib/api/timesheet';
 import { TimesheetDayDetailResponse } from '@/lib/types/timesheet-day-detail';
 
@@ -22,14 +21,13 @@ interface UseTimesheetDayDetailReturn {
 }
 
 export function useTimesheetDayDetail(date: string | null): UseTimesheetDayDetailReturn {
-  const hrmToken = useAppSelector((state) => state.auth.tokens.hrm?.token);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [day, setDay] = useState<TimesheetDayDetailResponse | null>(null);
 
-  // Fetch day detail khi date hoặc hrmToken thay đổi
+  // Fetch day detail khi date thay đổi
   useEffect(() => {
-    if (!date || !hrmToken) {
+    if (!date) {
       setDay(null);
       setError(null);
       setIsLoading(false);
@@ -40,7 +38,7 @@ export function useTimesheetDayDetail(date: string | null): UseTimesheetDayDetai
       try {
         setIsLoading(true);
         setError(null);
-        const response = await timesheetApi.getDayDetail(hrmToken, date);
+        const response = await timesheetApi.getDayDetail(date);
         setDay(response);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Lỗi khi tải chi tiết');
@@ -50,7 +48,7 @@ export function useTimesheetDayDetail(date: string | null): UseTimesheetDayDetai
     };
 
     fetchDetail();
-  }, [date, hrmToken]);
+  }, [date]);
 
   // Helper để parse ISO date string và convert sang timezone của client
   const parseISODate = (dateStr: string | null): dayjs.Dayjs | null => {

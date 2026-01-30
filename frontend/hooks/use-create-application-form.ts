@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useAppSelector, useAppDispatch } from '@/lib/hooks';
-import { setApprover } from '@/lib/features/application-form/applicationFormSlice';
+import { useAuthStore } from '@/lib/stores/auth-store';
+import { useApplicationFormStore } from '@/lib/stores/application-form-store';
 import { applicationApi } from '@/lib/api/application';
 import {
   CreateApplicationFormPayload,
@@ -78,13 +78,9 @@ export function useCreateApplicationForm({
   dayDetail,
   userId,
 }: UseCreateApplicationFormProps): UseCreateApplicationFormReturn {
-  const dispatch = useAppDispatch();
-  const hrmToken = useAppSelector(
-    (state) => state.auth.tokens.hrm?.token,
-  );
-  const savedApprovers = useAppSelector(
-    (state) => state.applicationForm.approvers,
-  );
+  const appToken = useAuthStore((state) => state.appToken);
+  const savedApprovers = useApplicationFormStore((state) => state.approvers);
+  const setApprover = useApplicationFormStore((state) => state.setApprover);
 
   const [typeId, setTypeId] = useState<number>(2);
   const [reasonId, setReasonId] = useState<number | null>(null);
@@ -120,12 +116,12 @@ export function useCreateApplicationForm({
 
   // Fetch types khi mở dialog
   useEffect(() => {
-    if (open && hrmToken) {
+    if (open && appToken) {
       const fetchTypes = async () => {
         setLoadingTypes(true);
         try {
           // Fetch types
-          const typesResponse = await applicationApi.getFormTypes(hrmToken);
+          const typesResponse = await applicationApi.getFormTypes();
           setTypes(typesResponse.items || []);
         } catch (err) {
           console.error('Failed to fetch form types:', err);
@@ -141,15 +137,14 @@ export function useCreateApplicationForm({
 
       fetchTypes();
     }
-  }, [open, hrmToken]);
+  }, [open, appToken]);
 
   // Fetch reasons khi typeId thay đổi
   useEffect(() => {
-    if (open && hrmToken && typeId) {
+    if (open && appToken && typeId) {
       const fetchReasons = async () => {
         try {
           const reasonsResponse = await applicationApi.getReasons(
-            hrmToken,
             typeId,
           );
           setReasons(reasonsResponse.items || []);
@@ -188,7 +183,7 @@ export function useCreateApplicationForm({
 
       fetchReasons();
     }
-  }, [typeId, open, hrmToken, calendarDay]);
+  }, [typeId, open, appToken, calendarDay]);
 
   // Số lượng người duyệt cho từng loại đơn (orderMax = số lượng người duyệt)
   const getApproverCount = useCallback((type: ApplicationFormType | null): number => {
@@ -199,7 +194,7 @@ export function useCreateApplicationForm({
 
   // Fetch người duyệt khi typeId thay đổi
   useEffect(() => {
-    if (open && hrmToken && typeId && selectedType && userId) {
+    if (open && appToken && typeId && selectedType && userId) {
       const fetchApprovers = async () => {
         setLoadingApprovers(true);
         try {
@@ -216,7 +211,6 @@ export function useCreateApplicationForm({
             const apiOrder = order + 1;
             const approversResponse =
               await applicationApi.getApprovalAssignments(
-                hrmToken,
                 typeId,
                 apiOrder,
                 userId,
@@ -255,7 +249,7 @@ export function useCreateApplicationForm({
       setApprovers([]);
       setApproverIds([]);
     }
-  }, [typeId, open, hrmToken, selectedType, userId, getApproverCount]);
+  }, [typeId, open, appToken, selectedType, userId, getApproverCount]);
 
   // Reset approverIds khi typeId thay đổi
   useEffect(() => {
@@ -279,18 +273,16 @@ export function useCreateApplicationForm({
         return newIds;
       });
 
-      // Lưu ngay vào Redux khi user thay đổi
+      // Lưu ngay vào store khi user thay đổi
       if (typeId && selectedType) {
-        dispatch(
-          setApprover({
-            typeId,
-            order: order + 1, // API dùng 1-based order
-            userId: approverId,
-          }),
+        setApprover(
+          typeId,
+          order + 1, // API dùng 1-based order
+          approverId,
         );
       }
     },
-    [typeId, selectedType, dispatch],
+    [typeId, selectedType, setApprover],
   );
 
   // Tính toán thời gian tự động dựa trên typeId và calendarDay
@@ -543,7 +535,7 @@ export function useCreateApplicationForm({
   const handleSubmit = useCallback(async (): Promise<boolean> => {
     if (!validate()) return false;
 
-    if (!hrmToken) {
+    if (!appToken) {
       setError('Chưa đăng nhập với HRM. Vui lòng đăng nhập.');
       return false;
     }
@@ -600,7 +592,7 @@ export function useCreateApplicationForm({
         description: selectedType?.name || 'Đơn từ',
       };
 
-      await applicationApi.createApplicationForm(hrmToken, payload);
+      await applicationApi.createApplicationForm(payload);
       return true;
     } catch {
       setError('Lỗi khi tạo đơn từ');
@@ -608,7 +600,7 @@ export function useCreateApplicationForm({
     } finally {
       setLoading(false);
     }
-  }, [validate, hrmToken, typeId, date, timeStart, timeEnd, reasonId, reasons, selectedType, approverIds, getApproverCount]);
+  }, [validate, appToken, typeId, date, timeStart, timeEnd, reasonId, reasons, selectedType, approverIds, getApproverCount]);
 
   return {
     typeId,

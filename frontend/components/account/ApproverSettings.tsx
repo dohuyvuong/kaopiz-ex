@@ -1,6 +1,6 @@
 'use client';
 
-import { useAppSelector } from '@/lib/hooks';
+import { useAuthStore } from '@/lib/stores/auth-store';
 import { useApproverSettings } from '@/hooks/use-approver-settings';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Combobox } from '@/components/ui/combobox';
@@ -9,7 +9,7 @@ import { Loader2, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export function ApproverSettings() {
-  const hrmToken = useAppSelector((state) => state.auth.tokens.hrm?.token);
+  const appToken = useAuthStore((state) => state.appToken);
 
   const {
     types,
@@ -21,7 +21,7 @@ export function ApproverSettings() {
     handleApproverChange,
   } = useApproverSettings();
 
-  if (!hrmToken) {
+  if (!appToken) {
     return (
       <Alert>
         <AlertCircle className="h-4 w-4" />

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useAppSelector } from '@/lib/hooks';
+import { useAuthStore } from '@/lib/stores/auth-store';
 import { checklistApi, CodeReview } from '@/lib/api/checklist';
 import {
   Table,
@@ -35,9 +35,7 @@ import { ExternalLink, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 
 export function ChecklistTable() {
-  const ksystemToken = useAppSelector(
-    (state) => state.auth.tokens.ksystem?.token,
-  );
+  const appToken = useAuthStore((state) => state.appToken);
   const [reviews, setReviews] = useState<CodeReview[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +45,7 @@ export function ChecklistTable() {
   const [perPage, setPerPage] = useState(10);
 
   const fetchReviews = async (page: number = 1, itemsPerPage: number = perPage) => {
-    if (!ksystemToken) {
+    if (!appToken) {
       setError('Chưa đăng nhập với Ksystem. Vui lòng đăng nhập bằng Microsoft SSO.');
       setLoading(false);
       return;
@@ -56,7 +54,7 @@ export function ChecklistTable() {
     try {
       setLoading(true);
       setError(null);
-      const response = await checklistApi.getMyPendingReviews(ksystemToken, {
+      const response = await checklistApi.getMyPendingReviews({
         page,
         perPage: itemsPerPage,
       });
@@ -73,7 +71,7 @@ export function ChecklistTable() {
 
   useEffect(() => {
     fetchReviews(1, perPage);
-  }, [ksystemToken, perPage]);
+  }, [appToken, perPage]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('vi-VN', {
