@@ -8,6 +8,10 @@ import {
   ApplicationFormReasonsResponseDto,
 } from './dto/application-form-types.dto';
 import { ApprovalAssignmentsResponseDto } from './dto/approval-assignment.dto';
+import {
+  HrmApplicationFormDataPayload,
+  HrmTrackingTimePayload,
+} from './interfaces/hrm-api-payload.interface';
 
 /**
  * Service để xử lý logic application forms
@@ -123,13 +127,13 @@ export class ApplicationService {
     formData.append('type_id', String(payload.typeId));
 
     // data (JSON string với snake_case)
-    const dataObj: any = {};
+    const dataObj: HrmApplicationFormDataPayload = {};
     if (payload.data.reasonId !== undefined) {
       dataObj.reason_id = payload.data.reasonId;
     }
     if (payload.data.trackingTimes && payload.data.trackingTimes.length > 0) {
       dataObj.tracking_times = payload.data.trackingTimes.map((tt) => {
-        const trackingTime: any = {};
+        const trackingTime: HrmTrackingTimePayload = {};
         if (tt.date !== undefined) trackingTime.date = tt.date;
         if (tt.dateStart !== undefined) trackingTime.date_start = tt.dateStart;
         if (tt.dateEnd !== undefined) trackingTime.date_end = tt.dateEnd;

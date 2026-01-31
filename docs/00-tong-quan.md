@@ -9,6 +9,7 @@ KaopizEX là hệ thống công cụ nội bộ của Kaopiz, được xây dự
 - **Application Form Management**: Tạo và quản lý đơn từ (nghỉ phép, vắng mặt)
 - **Auto-create Applications**: Tự động tính toán và tạo đơn từ để giảm phạt đi muộn/về sớm
 - **Approver Settings**: Cấu hình người duyệt mặc định cho từng loại đơn
+- **Background Automation**: Kiểm tra tự động định kỳ (checklist chờ duyệt, đơn cần tạo), thông báo Telegram, xác nhận hoặc tự duyệt sau timeout
 
 ## Kiến trúc tổng thể
 
@@ -198,6 +199,16 @@ Submit → Create All → Progress Tracking → Reload Calendar
 
 Chi tiết: [05-auto-create-applications.md](./05-auto-create-applications.md)
 
+### 5. Background Automation Flow
+
+```
+User → Account → Tab "Tự động hóa" → Bật job + cấu hình (kênh, thời gian tự duyệt) →
+Cron kiểm tra (9h/10h) → Tạo PendingAction → Gửi notification (Telegram) →
+User xác nhận (approve/reject) hoặc sau N phút tự duyệt → Thực hiện (submit review / tạo đơn)
+```
+
+Chi tiết: [11-background-automation.md](./11-background-automation.md)
+
 ## State Management
 
 ### Zustand Stores
@@ -228,7 +239,16 @@ Chi tiết: [08-state-management.md](./08-state-management.md)
 - `GET /application/approval-assignments?typeId=1&order=1&userId=861` - Lấy người duyệt
 - `POST /application/forms` - Tạo đơn từ
 
-Chi tiết: [10-api-integration.md](./10-api-integration.md)
+### Automation (Background Jobs)
+
+- `GET /automation/settings` - Lấy tất cả automation settings
+- `GET /automation/settings/:jobType` - Lấy setting theo jobType
+- `PUT /automation/settings/:jobType` - Cập nhật setting
+- `GET /automation/pending-actions` - Lấy danh sách pending actions
+- `POST /automation/approve` - Xác nhận và thực hiện pending action
+- `POST /automation/reject` - Từ chối pending action
+
+Chi tiết: [10-api-integration.md](./10-api-integration.md), [11-background-automation.md](./11-background-automation.md)
 
 ## Mục lục tài liệu
 
@@ -243,8 +263,7 @@ Chi tiết: [10-api-integration.md](./10-api-integration.md)
 9. [08-state-management.md](./08-state-management.md) - State Management
 10. [09-ui-components.md](./09-ui-components.md) - UI Components
 11. [10-api-integration.md](./10-api-integration.md) - API Integration
-
-Phần chưa triển khai (background automation: cron auto-review, auto-create forms) xem **BACKGROUND_AUTOMATION_PLAN.md** ở root project.
+12. [11-background-automation.md](./11-background-automation.md) - Background Automation (kiểm tra tự động, notification, approve/reject)
 
 ## Development Setup
 

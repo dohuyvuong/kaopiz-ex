@@ -21,6 +21,12 @@ export interface AppConfig {
   hrmApiBaseUrl?: string;
 
   // App JWT
-  jwtSecret?: string;
-  jwtExpiresIn?: string;
+  jwtSecret: string;
+  jwtExpiresIn: string;
+
+  // Telegram Bot
+  telegramBotToken?: string;
+
+  // App URL
+  appUrl: string;
 }

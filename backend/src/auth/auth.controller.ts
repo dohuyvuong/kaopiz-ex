@@ -18,10 +18,14 @@ import { AppConfigService } from '../config/config.service';
 import { extractAuthParams } from '../utils/extract-auth-params.util';
 import { BadRequestException, NotFoundException } from '../common/exceptions';
 import { ProviderAuthorizeQueryDto } from './dto/provider-authorize.dto';
+import {
+  isKsystemUserInfo,
+  isHrmUserInfo,
+} from './interfaces/system-user-info.interface';
 import { ProviderExchangeTokenDto } from './dto/provider-exchange-token.dto';
 import {
   AuthorizeResponseDto,
-  ExchangeTokenResponseDto,
+  SsoCallbackResponseDto,
 } from './dto/auth-response.dto';
 import { KsystemOAuthProvider } from './providers/ksystem-oauth.provider';
 
@@ -124,7 +128,7 @@ export class AuthController {
   async exchangeProviderToken(
     @Param('provider') providerName: string,
     @Body() body: ProviderExchangeTokenDto,
-  ): Promise<ExchangeTokenResponseDto> {
+  ): Promise<SsoCallbackResponseDto> {
     const provider = this.authService.getProvider(providerName);
     if (!provider) {
       throw new NotFoundException(`Provider '${providerName}' không tồn tại`);
@@ -164,16 +168,16 @@ export class AuthController {
     // Extract email from userInfo
     let email: string | undefined;
     let name: string | undefined;
-    const userInfo = tokenResponse.userInfo as any;
+    const userInfo = tokenResponse.userInfo;
 
-    if (provider.system === 'ksystem') {
+    if (provider.system === 'ksystem' && isKsystemUserInfo(userInfo)) {
       // Ksystem: userInfo.email
-      email = userInfo?.email;
-      name = userInfo?.name;
-    } else if (provider.system === 'hrm') {
+      email = userInfo.email;
+      name = userInfo.name;
+    } else if (provider.system === 'hrm' && isHrmUserInfo(userInfo)) {
       // HRM: userInfo.info.email
-      email = userInfo?.info?.email;
-      name = userInfo?.info?.name;
+      email = userInfo.info.email;
+      name = userInfo.info.name;
     }
 
     if (!email) {
@@ -222,7 +226,7 @@ export class AuthController {
         },
         systems,
       },
-    } as any;
+    };
   }
 
   /**

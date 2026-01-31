@@ -25,3 +25,19 @@ export interface ExchangeTokenResponseDto {
     note: string;
   };
 }
+
+export interface SsoCallbackResponseDto {
+  success: boolean;
+  message: string;
+  data: {
+    appToken: string;
+    appRefreshToken: string;
+    expiresIn: number;
+    user: {
+      id: number;
+      email: string;
+      name: string | null;
+    };
+    systems: SystemName[];
+  };
+}

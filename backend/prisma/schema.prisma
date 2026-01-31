@@ -17,8 +17,10 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  systemTokens      SystemToken[]
-  appRefreshTokens  AppRefreshToken[]
+  systemTokens           SystemToken[]
+  appRefreshTokens       AppRefreshToken[]
+  userAutomationSettings UserAutomationSetting[]
+  pendingActions         PendingAction[]
 }
 
 model SystemToken {
@@ -44,4 +46,57 @@ model AppRefreshToken {
   createdAt DateTime @default(now())
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// User đăng kí + cấu hình automation (bật/tắt, tham số, notification, timeout)
+model UserAutomationSetting {
+  id                      Int      @id @default(autoincrement())
+  userId                  Int
+  jobType                 String   // 'auto-review-checklist' | 'auto-create-forms'
+  enabled                 Boolean  @default(false)
+  params                  String?  // JSON: { maxReviews?, projectName?, lookbackDays?, ... }
+  notificationChannel     String?  // 'telegram' | 'email' | ...
+  notificationTarget      String?  // VD: telegram chat_id, email address
+  autoApproveAfterMinutes Int?     // Sau N phút không phản hồi thì tự duyệt (null = không tự duyệt)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, jobType])
+  @@index([jobType, enabled])
+}
+
+// Hành động chờ user xác nhận (hoặc sẽ tự duyệt sau expiresAt)
+model PendingAction {
+  id         Int       @id @default(autoincrement())
+  userId     Int
+  jobType    String    // 'auto-review-checklist' | 'auto-create-forms'
+  payload    String    // JSON: dữ liệu cần thực hiện (VD: list review ids, form payloads)
+  status     String    // 'pending' | 'approved' | 'rejected' | 'auto_approved'
+  notifiedAt DateTime  @default(now())
+  expiresAt  DateTime  // Hết hạn sau autoApproveAfterMinutes
+  approvedAt DateTime?
+  executedAt DateTime?
+  error      String?   // Lỗi khi thực hiện (nếu có)
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([status, expiresAt])
+}
+
+model JobLog {
+  id          Int       @id @default(autoincrement())
+  jobName     String
+  userId      Int?
+  status      String // 'success', 'failed', 'partial'
+  details     String?
+  error       String?
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  duration    Int? // milliseconds
+
+  @@index([jobName, startedAt])
 }

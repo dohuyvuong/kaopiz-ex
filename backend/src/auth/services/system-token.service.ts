@@ -2,6 +2,14 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SystemToken } from '@prisma/client';
 import { SystemName } from '../../common/types/system.types';
+import {
+  UserWithValidToken,
+  UserWithInvalidToken,
+} from '../interfaces/automation-user.interface';
+import {
+  JobType,
+  NotificationChannel,
+} from '../../automation/constants/automation.constants';
 
 export interface UpsertSystemTokenData {
   token: string;
@@ -128,5 +136,82 @@ export class SystemTokenService {
     this.logger.log(
       `Deleted system token for user ${userId}, system ${system}`,
     );
+  }
+
+  /**
+   * Get users with automation enabled for a specific job type
+   * Returns users with valid tokens and users with invalid tokens (for notification)
+   */
+  async getUsersWithAutomationEnabled(jobType: string): Promise<{
+    usersWithValidToken: UserWithValidToken[];
+    usersWithInvalidToken: UserWithInvalidToken[];
+  }> {
+    // Determine system based on jobType
+    const system: SystemName =
+      jobType === 'auto-review-checklist' ? 'ksystem' : 'hrm';
+
+    // Get all users with automation enabled for this jobType
+    const settings = await this.prisma.userAutomationSetting.findMany({
+      where: {
+        jobType,
+        enabled: true,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    const usersWithValidToken: UserWithValidToken[] = [];
+    const usersWithInvalidToken: UserWithInvalidToken[] = [];
+
+    for (const setting of settings) {
+      // Get token for this user
+      const token = await this.getToken(setting.userId, system);
+
+      if (token) {
+        // Valid token
+        usersWithValidToken.push({
+          userId: setting.userId,
+          user: setting.user,
+          setting: {
+            id: setting.id,
+            jobType: setting.jobType as JobType,
+            params: setting.params ? JSON.parse(setting.params) : {},
+            notificationChannel:
+              setting.notificationChannel as NotificationChannel,
+            notificationTarget: setting.notificationTarget!,
+            autoApproveAfterMinutes: setting.autoApproveAfterMinutes!,
+          },
+          token,
+          system,
+        });
+      } else {
+        // Invalid or missing token
+        usersWithInvalidToken.push({
+          userId: setting.userId,
+          user: setting.user,
+          setting: {
+            id: setting.id,
+            jobType: setting.jobType as JobType,
+            notificationChannel:
+              setting.notificationChannel as NotificationChannel,
+            notificationTarget: setting.notificationTarget!,
+          },
+          system,
+        });
+      }
+    }
+
+    this.logger.log(
+      `Found ${usersWithValidToken.length} users with valid token and ${usersWithInvalidToken.length} users with invalid token for jobType: ${jobType}`,
+    );
+
+    return { usersWithValidToken, usersWithInvalidToken };
   }
 }

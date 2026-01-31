@@ -30,20 +30,17 @@ export class AppJwtService {
       email,
     };
 
-    // Get JWT config from env (with defaults)
-    const secret =
-      process.env.JWT_SECRET ||
-      this.configService.getConfig().jwtSecret ||
-      'default-secret-change-in-production';
-    const expiresInStr = process.env.JWT_EXPIRES_IN || '1h'; // 1 hour default
+    // Get JWT config from AppConfigService
+    const config = this.configService.getConfig();
 
+    // Type assertion needed for jsonwebtoken compatibility
     const appToken = await this.jwtService.signAsync(payload, {
-      secret,
-      expiresIn: expiresInStr as any,
-    });
+      secret: config.jwtSecret,
+      expiresIn: config.jwtExpiresIn,
+    } as Parameters<typeof this.jwtService.signAsync>[1]);
 
     // Calculate expiresIn in seconds
-    const expiresInSeconds = this.parseExpiresIn(expiresInStr);
+    const expiresInSeconds = this.parseExpiresIn(config.jwtExpiresIn);
 
     this.logger.log(`Signed app JWT for user ${userId}`);
 
@@ -58,15 +55,12 @@ export class AppJwtService {
    */
   async verify(token: string): Promise<AppTokenPayload | null> {
     try {
-      const secret =
-        process.env.JWT_SECRET ||
-        this.configService.getConfig().jwtSecret ||
-        'default-secret-change-in-production';
+      const config = this.configService.getConfig();
 
       const payload = await this.jwtService.verifyAsync<AppTokenPayload>(
         token,
         {
-          secret,
+          secret: config.jwtSecret,
         },
       );
 

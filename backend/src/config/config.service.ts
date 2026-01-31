@@ -44,6 +44,17 @@ export class AppConfigService {
       hrmApiBaseUrl:
         this.configService.get<string>('HRM_API_BASE_URL') ||
         'https://api.hrm.kaopiz.com/api',
+
+      // App JWT
+      jwtSecret: this.configService.get<string>('JWT_SECRET'),
+      jwtExpiresIn: this.configService.get<string>('JWT_EXPIRES_IN') || '1h',
+
+      // Telegram Bot
+      telegramBotToken: this.configService.get<string>('TELEGRAM_BOT_TOKEN'),
+
+      // App URL
+      appUrl:
+        this.configService.get<string>('APP_URL') || 'http://localhost:3000',
     };
   }
 }
