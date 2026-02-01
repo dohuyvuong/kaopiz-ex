@@ -1,21 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import apiClient from '@/lib/api/client';
 import { toast } from 'sonner';
-import {
-  JobType,
-  PendingActionStatus,
-  PendingActionPayload,
-} from '@/types/automation.types';
+import type { PendingAction } from '@/types/automation.types';
 
-export interface PendingAction {
-  id: number;
-  jobType: JobType;
-  payload: PendingActionPayload;
-  status: PendingActionStatus;
-  notifiedAt: Date;
-  expiresAt: Date;
-  createdAt: Date;
-}
+export type { PendingAction };
 
 export function usePendingActions() {
   const [actions, setActions] = useState<PendingAction[]>([]);

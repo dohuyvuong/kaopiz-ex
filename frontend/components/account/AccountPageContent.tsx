@@ -3,10 +3,8 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ApproverSettings } from './ApproverSettings';
 import { SystemSettings } from './SystemSettings';
-import { AutomationSettings } from './AutomationSettings';
 
 export function AccountPageContent() {
-
   return (
     <div className="container mx-auto py-6">
       <div className="mb-6">
@@ -20,7 +18,6 @@ export function AccountPageContent() {
         <TabsList>
           <TabsTrigger value="systems">Hệ thống</TabsTrigger>
           <TabsTrigger value="approvers">Người duyệt</TabsTrigger>
-          <TabsTrigger value="automation">Tự động hóa</TabsTrigger>
         </TabsList>
 
         <TabsContent value="systems" className="mt-6">
@@ -29,10 +26,6 @@ export function AccountPageContent() {
 
         <TabsContent value="approvers" className="mt-6">
           <ApproverSettings />
-        </TabsContent>
-
-        <TabsContent value="automation" className="mt-6">
-          <AutomationSettings />
         </TabsContent>
       </Tabs>
     </div>

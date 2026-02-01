@@ -64,12 +64,22 @@ export class AutomationController {
 
   /**
    * GET /api/automation/pending-actions
-   * Get pending actions for current user
+   * Get pending actions for current user (status = pending only)
    */
   @Get('pending-actions')
   async getPendingActions(@User('id') userId: number) {
     this.logger.log(`Getting pending actions for user ${userId}`);
     return this.automationService.getPendingActions(userId);
+  }
+
+  /**
+   * GET /api/automation/actions
+   * Get all actions for current user (all statuses)
+   */
+  @Get('actions')
+  async getAllActions(@User('id') userId: number) {
+    this.logger.log(`Getting all actions for user ${userId}`);
+    return this.automationService.getAllActions(userId);
   }
 
   /**

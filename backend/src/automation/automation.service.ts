@@ -168,7 +168,7 @@ export class AutomationService {
   }
 
   /**
-   * Get pending actions for a user
+   * Get pending actions for a user (status = pending only)
    */
   async getPendingActions(userId: number) {
     const actions = await this.prisma.pendingAction.findMany({
@@ -181,6 +181,34 @@ export class AutomationService {
       },
     });
 
+    return this.mapActions(actions);
+  }
+
+  /**
+   * Get all actions for a user (all statuses)
+   */
+  async getAllActions(userId: number) {
+    const actions = await this.prisma.pendingAction.findMany({
+      where: { userId },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    return this.mapActions(actions);
+  }
+
+  private mapActions(
+    actions: Array<{
+      id: number;
+      jobType: string;
+      payload: string;
+      status: string;
+      notifiedAt: Date | null;
+      expiresAt: Date;
+      createdAt: Date;
+    }>,
+  ) {
     return actions.map((action) => ({
       id: action.id,
       jobType: action.jobType,

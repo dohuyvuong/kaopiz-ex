@@ -22,12 +22,22 @@ export interface UpdateAutomationSettingDto {
   autoApproveAfterMinutes?: number;
 }
 
+import type { PendingAction } from '@/types/automation.types';
+
 export const automationApi = {
   /**
    * Get all automation settings for current user
    */
   getAllSettings: async (): Promise<AutomationSetting[]> => {
     const response = await apiClient.get('/automation/settings');
+    return response.data;
+  },
+
+  /**
+   * Get all actions for current user (all statuses)
+   */
+  getAllActions: async (): Promise<PendingAction[]> => {
+    const response = await apiClient.get('/automation/actions');
     return response.data;
   },
 

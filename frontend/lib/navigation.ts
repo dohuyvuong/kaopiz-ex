@@ -1,4 +1,4 @@
-import { type LucideIcon, LayoutDashboard, CheckSquare, Play, Clock, User, Calendar } from "lucide-react"
+import { type LucideIcon, LayoutDashboard, CheckSquare, Play, Clock, User, Calendar, Zap, Settings, ListTodo, History } from "lucide-react"
 import { type System, SYSTEMS } from "./types/system"
 
 export type SystemRequirement = System
@@ -52,6 +52,27 @@ export const navItems: NavItemType[] = [
     url: "/timesheet",
     icon: Calendar,
     system: SYSTEMS.HRM, // Cần HRM token
+  },
+  {
+    title: "Tự động hóa",
+    icon: Zap,
+    items: [
+      {
+        title: "Cài đặt",
+        url: "/automation/settings",
+        icon: Settings,
+      },
+      {
+        title: "Hành động chờ duyệt",
+        url: "/automation/pending",
+        icon: ListTodo,
+      },
+      {
+        title: "Tất cả hành động",
+        url: "/automation/actions",
+        icon: History,
+      },
+    ],
   },
   {
     title: "Tài khoản",

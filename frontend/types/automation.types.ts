@@ -62,3 +62,16 @@ export interface FormCreationPayload {
  * Union type for all payload types
  */
 export type PendingActionPayload = ChecklistReviewPayload | FormCreationPayload;
+
+/**
+ * Pending action (from API)
+ */
+export interface PendingAction {
+  id: number;
+  jobType: JobType;
+  payload: PendingActionPayload;
+  status: PendingActionStatus;
+  notifiedAt: Date;
+  expiresAt: Date;
+  createdAt: Date;
+}
