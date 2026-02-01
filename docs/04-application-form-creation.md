@@ -132,11 +132,12 @@ if (calendarDay && calendarDay.timeIn && calendarDay.timeOut) {
 
 **Code reference**: `frontend/hooks/use-create-application-form.ts:475-490`
 
-#### 4. Đơn vắng mặt (typeId: 2)
+#### 4. Đơn vắng mặt (typeId: 2) - Thay đổi thời gian làm việc
 
+- **Điều kiện ngày:** Ngày đó phải làm đủ ít nhất 8 tiếng theo **thời gian hiệu quả** = (timeOut − timeIn) − **nghỉ trưa 1 giờ** − phút về sớm (nghỉ trưa không tính vào giờ làm)
 - Phải có `timeStart` và `timeEnd`
-- Không được quá 60 phút
-- Một tuần chỉ có 1 đơn vắng mặt
+- Mỗi đơn tối đa 60 phút (thay đổi giờ càng nhiều càng tốt)
+- Một tuần chỉ có tối đa 2 đơn vắng mặt loại này
 
 ```typescript
 if (!timeStart || !timeEnd) {
@@ -152,7 +153,7 @@ if (calculatedMinutes > 60) {
 
 const hasAbsenceFormInWeek = checkAbsenceFormInWeek(date, calendarDays, dayDetailMap, mergedDays);
 if (hasAbsenceFormInWeek) {
-  setValidationError('Một tuần chỉ có thể có 1 đơn vắng mặt...');
+  setValidationError('Một tuần chỉ có thể có tối đa 2 đơn vắng mặt...');
   return false;
 }
 ```
@@ -200,13 +201,13 @@ if (selectedDate.isBefore(minDate, 'day')) {
 #### 3. Absence Form in Week Warning
 
 - Chỉ hiển thị khi typeId === 2
-- Message: "Đã có đơn vắng mặt (Thay đổi thời gian làm việc) trong tuần này..."
+- Message: "Đã có 2 đơn vắng mặt (Thay đổi thời gian làm việc) trong tuần này..."
 
 ```typescript
 if (typeId === 2) {
   const hasAbsenceFormInWeek = checkAbsenceFormInWeek(date, calendarDays, dayDetailMap, mergedDays);
   if (hasAbsenceFormInWeek) {
-    return 'Đã có đơn vắng mặt (Thay đổi thời gian làm việc) trong tuần này...';
+    return 'Đã có 2 đơn vắng mặt (Thay đổi thời gian làm việc) trong tuần này...';
   }
 }
 ```

@@ -99,28 +99,34 @@ export function checkOverlappingForms(
 }
 
 /**
- * Kiểm tra đã có đơn vắng mặt (typeId 2) trong tuần chưa
+ * Đếm số đơn vắng mặt (typeId 2) trong tuần
  * Bao gồm cả approved và pending forms
+ * @returns Số lượng đơn vắng mặt trong tuần
  */
-export function checkAbsenceFormInWeek(
+export function countAbsenceFormsInWeek(
   date: string,
   calendarDays: Array<{ date: Date; timesheet: TimesheetDay | null }> | undefined,
   dayDetailMap?: Map<string, { applicationForms?: DayDetailApplicationForm[] }>,
   mergedDays?: Map<string, TimesheetDay & { hasPendingForms?: boolean }>,
-): boolean {
-  if (!calendarDays || !date) return false;
+): number {
+  if (!calendarDays || !date) return 0;
 
   const selectedDate = dayjs(date);
   const weekStart = selectedDate.startOf('week'); // Chủ nhật
   const weekEnd = selectedDate.endOf('week'); // Thứ bảy
 
-  return calendarDays.some(({ date: dayDate, timesheet }) => {
-    if (!timesheet) return false;
+  let count = 0;
+  const processedDates = new Set<string>(); // Tránh đếm trùng
+
+  calendarDays.forEach(({ date: dayDate, timesheet }) => {
+    if (!timesheet) return;
     const day = dayjs(dayDate);
     // Kiểm tra trong cùng tuần (bao gồm cả weekStart và weekEnd)
-    if (day.isBefore(weekStart, 'day') || day.isAfter(weekEnd, 'day')) return false;
+    if (day.isBefore(weekStart, 'day') || day.isAfter(weekEnd, 'day')) return;
 
     const dateStr = day.format('YYYY-MM-DD');
+    if (processedDates.has(dateStr)) return;
+    processedDates.add(dateStr);
 
     // Kiểm tra approved forms
     // Đơn vắng mặt (typeId 2) với reasonId 21 (Thay đổi thời gian làm việc)
@@ -131,7 +137,10 @@ export function checkAbsenceFormInWeek(
           form.data?.trackingTimes?.some((tt) => tt.reasonId === 21),
       ) || false;
 
-    if (hasApprovedAbsenceForm) return true;
+    if (hasApprovedAbsenceForm) {
+      count++;
+      return;
+    }
 
     // Kiểm tra pending forms từ mergedDays (ưu tiên vì có data cho tất cả các ngày trong tuần)
     if (mergedDays) {
@@ -146,7 +155,10 @@ export function checkAbsenceFormInWeek(
             form.data?.trackingTimes?.some((tt) => tt.reasonId === 21) &&
             !approvedFormIds.has(form.id), // Chỉ lấy pending forms
         );
-        if (hasPendingAbsenceForm) return true;
+        if (hasPendingAbsenceForm) {
+          count++;
+          return;
+        }
       }
     }
 
@@ -161,11 +173,28 @@ export function checkAbsenceFormInWeek(
             form.data?.trackingTimes?.some((tt) => tt.reasonId === 21),
         ) || false;
 
-      if (hasPendingAbsenceForm) return true;
+      if (hasPendingAbsenceForm) {
+        count++;
+      }
     }
-
-    return false;
   });
+
+  return count;
+}
+
+/**
+ * Kiểm tra đã đủ số đơn vắng mặt trong tuần chưa (>= 2 đơn)
+ * Bao gồm cả approved và pending forms
+ * @returns true nếu đã có >= 2 đơn vắng mặt trong tuần
+ */
+export function checkAbsenceFormInWeek(
+  date: string,
+  calendarDays: Array<{ date: Date; timesheet: TimesheetDay | null }> | undefined,
+  dayDetailMap?: Map<string, { applicationForms?: DayDetailApplicationForm[] }>,
+  mergedDays?: Map<string, TimesheetDay & { hasPendingForms?: boolean }>,
+): boolean {
+  const count = countAbsenceFormsInWeek(date, calendarDays, dayDetailMap, mergedDays);
+  return count >= 2;
 }
 
 /**

@@ -394,7 +394,7 @@ export function useCreateApplicationForm({
       const dayDetailMap = createDayDetailMap();
       const hasAbsenceFormInWeek = checkAbsenceFormInWeek(date, calendarDays, dayDetailMap, mergedDays);
       if (hasAbsenceFormInWeek) {
-        return 'Đã có đơn vắng mặt (Thay đổi thời gian làm việc) trong tuần này. Một tuần chỉ có thể có 1 đơn vắng mặt. Vui lòng tạo đơn xin nghỉ phép thay thế.';
+        return 'Đã có 2 đơn vắng mặt (Thay đổi thời gian làm việc) trong tuần này. Một tuần chỉ có thể có tối đa 2 đơn vắng mặt. Vui lòng tạo đơn xin nghỉ phép thay thế.';
       }
     }
 
@@ -483,6 +483,23 @@ export function useCreateApplicationForm({
 
     // Kiểm tra đơn Vắng mặt - Thay đổi thời gian làm việc
     if (typeId === 2) {
+      // Điều kiện: ngày đó phải làm đủ ít nhất 8 tiếng (thời gian hiệu quả = timeOut - timeIn - nghỉ trưa 1h - phút về sớm)
+      const LUNCH_BREAK_MINUTES = 60; // 1 giờ nghỉ trưa không tính vào giờ làm
+      if (calendarDay?.timeIn && calendarDay?.timeOut) {
+        const timeInTime = dayjs(`2000-01-01 ${calendarDay.timeIn}`, 'YYYY-MM-DD HH:mm');
+        const timeOutTime = dayjs(`2000-01-01 ${calendarDay.timeOut}`, 'YYYY-MM-DD HH:mm');
+        const rawMinutes = timeOutTime.diff(timeInTime, 'minute');
+        const minutesEarly = (calendarDay as { minutesEarly?: number }).minutesEarly ?? 0;
+        const effectiveWorkMinutes = rawMinutes - LUNCH_BREAK_MINUTES - minutesEarly;
+        const requiredWorkMinutes = 8 * 60; // 8 tiếng = 480 phút
+        if (effectiveWorkMinutes < requiredWorkMinutes) {
+          setValidationError(
+            'Đơn Vắng mặt (Thay đổi thời gian làm việc) chỉ được tạo khi ngày đó làm đủ ít nhất 8 tiếng (sau khi trừ nghỉ trưa 1h và phần về sớm).',
+          );
+          return false;
+        }
+      }
+
       if (!timeStart || !timeEnd) {
         setValidationError('Vui lòng nhập thời gian bắt đầu và kết thúc');
         return false;
@@ -522,7 +539,7 @@ export function useCreateApplicationForm({
       const hasAbsenceFormInWeek = checkAbsenceFormInWeek(date, calendarDays, dayDetailMap, mergedDays);
       if (hasAbsenceFormInWeek) {
         setValidationError(
-          'Một tuần chỉ có thể có 1 đơn vắng mặt (Thay đổi thời gian làm việc). Vui lòng tạo đơn xin nghỉ phép thay thế.',
+          'Một tuần chỉ có thể có tối đa 2 đơn vắng mặt (Thay đổi thời gian làm việc). Vui lòng tạo đơn xin nghỉ phép thay thế.',
         );
         return false;
       }

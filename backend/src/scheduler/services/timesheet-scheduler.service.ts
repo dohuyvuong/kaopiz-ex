@@ -96,14 +96,15 @@ export class TimesheetSchedulerService {
     );
 
     // Calculate months to check (current month and previous month if lookbackDays > 7)
+    // HRM API month_year format: "MM-YYYY" (ví dụ: "01-2026", "10-2025")
     const today = dayjs();
     const monthsToCheck = new Set<string>();
-    monthsToCheck.add(today.format('YYYY-MM')); // Current month
+    monthsToCheck.add(today.format('MM-YYYY')); // Current month
 
     // If lookbackDays goes into previous month, add it
     const oldestDate = today.subtract(lookbackDays, 'day');
     if (oldestDate.month() !== today.month()) {
-      monthsToCheck.add(oldestDate.format('YYYY-MM'));
+      monthsToCheck.add(oldestDate.format('MM-YYYY'));
     }
 
     // Get timesheet data for all months

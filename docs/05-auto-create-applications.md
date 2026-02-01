@@ -3,7 +3,7 @@
 ## Tổng quan
 
 Module này tự động tính toán và tạo các đơn từ để giảm tổng đi muộn/về sớm xuống ≤ 90 phút. Logic ưu tiên:
-1. Tận dụng đơn vắng mặt (1 tuần 1 lần, tối đa 60 phút) - không tốn phép năm
+1. **Đơn vắng mặt (Thay đổi thời gian làm việc):** Chỉ tạo khi ngày đó làm đủ ít nhất 8 tiếng theo **thời gian hiệu quả** = (timeOut − timeIn) − **nghỉ trưa 1 giờ** − phút về sớm. Ví dụ 28/1: 8h02 − 1h − 47p = 7h15 &lt; 8h → không ưu tiên. Mỗi đơn tối đa 60 phút. Một tuần tối đa 2 đơn loại này — không tốn phép năm.
 2. Tạo đơn nghỉ phép cho phần còn lại (nếu tổng > 90 phút)
 
 ## Component Structure
@@ -52,13 +52,14 @@ Hook quản lý logic tính toán và tạo đơn.
 
 **Code reference**: `frontend/lib/utils/auto-create-applications.ts:230-244`
 
-#### 4. Tận dụng đơn vắng mặt
+#### 4. Tận dụng đơn vắng mặt (Thay đổi thời gian làm việc)
 
-- Tạo đơn vắng mặt cho ngày có vi phạm lớn nhất (nếu chưa có trong tuần)
-- Tối đa 60 phút
+- **Điều kiện:** Thời gian hiệu quả ≥ 8 tiếng. Thời gian hiệu quả = (timeOut − timeIn) − **nghỉ trưa 1h** − phút về sớm. Ngày 28/1: 8h02 − 1h − 47p = 7h15 &lt; 8h → không ưu tiên; chọn 26/1 và 30/1
+- Tối đa 2 đơn vắng mặt mỗi tuần, cho các ngày có vi phạm lớn nhất
+- Mỗi đơn tối đa 60 phút (thay đổi giờ càng nhiều càng tốt)
 - Ưu tiên đi muộn trước, sau đó về sớm
 
-**Code reference**: `frontend/lib/utils/auto-create-applications.ts:246-324`
+**Code reference**: `frontend/lib/utils/auto-create-applications.ts:269-385`
 
 #### 5. Tạo đơn nghỉ phép cho phần còn lại
 

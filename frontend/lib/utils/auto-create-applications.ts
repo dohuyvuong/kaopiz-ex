@@ -1,6 +1,9 @@
 import dayjs from 'dayjs';
 import { TimesheetDay } from '@/lib/types/timesheet';
 
+/** Thời gian nghỉ trưa (phút) — không tính vào thời gian làm việc khi kiểm tra đủ 8h */
+const LUNCH_BREAK_MINUTES = 60;
+
 export interface ApplicationToCreate {
   date: string; // Format: "YYYY-MM-DD"
   typeId: number; // 1 = Nghỉ phép, 2 = Vắng mặt
@@ -24,23 +27,28 @@ interface DayViolation {
 }
 
 /**
- * Kiểm tra đã có đơn vắng mặt trong tuần chưa (từ calendarDays và mergedDays)
+ * Đếm số đơn vắng mặt trong tuần (từ calendarDays và mergedDays)
  */
-function hasAbsenceFormInWeek(
+function countAbsenceFormsInWeek(
   date: string,
   calendarDays: Array<{ date: Date; timesheet: TimesheetDay | null }>,
   mergedDays?: Map<string, TimesheetDay & { hasPendingForms?: boolean }>,
-): boolean {
+): number {
   const selectedDate = dayjs(date);
   const weekStart = selectedDate.startOf('week');
   const weekEnd = selectedDate.endOf('week');
 
-  return calendarDays.some(({ date: dayDate, timesheet }) => {
-    if (!timesheet) return false;
+  let count = 0;
+  const processedDates = new Set<string>();
+
+  calendarDays.forEach(({ date: dayDate, timesheet }) => {
+    if (!timesheet) return;
     const day = dayjs(dayDate);
-    if (day.isBefore(weekStart) || day.isAfter(weekEnd)) return false;
+    if (day.isBefore(weekStart) || day.isAfter(weekEnd)) return;
 
     const dateStr = dayjs(dayDate).format('YYYY-MM-DD');
+    if (processedDates.has(dateStr)) return;
+    processedDates.add(dateStr);
 
     // Kiểm tra từ timesheet (approved forms)
     const hasApprovedAbsence = timesheet.approvedApplicationForms?.some(
@@ -49,7 +57,10 @@ function hasAbsenceFormInWeek(
         form.data?.trackingTimes?.some((tt) => tt.reasonId === 21),
     ) || false;
 
-    if (hasApprovedAbsence) return true;
+    if (hasApprovedAbsence) {
+      count++;
+      return;
+    }
 
     // Kiểm tra từ mergedDays (pending forms)
     if (mergedDays) {
@@ -64,12 +75,14 @@ function hasAbsenceFormInWeek(
             form.data?.trackingTimes?.some((tt) => tt.reasonId === 21) &&
             !approvedFormIds.has(form.id), // Chỉ lấy pending forms
         );
-        if (hasPendingAbsence) return true;
+        if (hasPendingAbsence) {
+          count++;
+        }
       }
     }
-
-    return false;
   });
+
+  return count;
 }
 
 /**
@@ -245,13 +258,13 @@ export function calculateApplicationsToCreate(
 
   // 4. Bước 1: Kiểm tra đơn có thể được tạo (đã được lọc ở bước 2: violationsInWeek)
 
-  // Bước 2: Luôn làm tối đa 1 đơn vắng mặt (Thay đổi thời gian làm việc) nếu tuần đó có đi muộn/về sớm
-  // Ưu tiên tạo cho ngày có vi phạm lớn nhất để tận dụng tối đa 60 phút
-  const weekAbsenceMap = new Map<string, boolean>(); // key: ngày đầu tuần
+  // Bước 2: Tối đa 2 đơn vắng mặt (Thay đổi thời gian làm việc) mỗi tuần
+  // Điều kiện: ngày đó làm đủ ít nhất 8 tiếng. Mỗi đơn thay đổi tối đa 1 tiếng (60 phút), ưu tiên càng nhiều càng tốt.
+  const weekAbsenceCountMap = new Map<string, number>(); // key: ngày đầu tuần, value: số đơn đã tạo
   const absenceFormByDate = new Map<string, { late: number; early: number }>(); // key: date, value: số phút đã được cover bởi đơn vắng mặt
   const absenceFormTimeByDate = new Map<string, { timeStart: string; timeEnd: string; type: 'late' | 'early' }>(); // key: date, value: thời gian của đơn vắng mặt
 
-  // Luôn tạo đơn vắng mặt nếu có vi phạm trong tuần và chưa có đơn vắng mặt
+  // Tạo tối đa 2 đơn vắng mặt mỗi tuần
   // Ưu tiên ngày có vi phạm lớn nhất (đã được sắp xếp ở trên)
   for (const violation of violationsInWeek) {
     const violationDate = dayjs(violation.date);
@@ -266,11 +279,13 @@ export function calculateApplicationsToCreate(
       continue; // Đã có đơn cho ngày này, bỏ qua
     }
 
-    // Tận dụng đơn vắng mặt nếu chưa có trong tuần này
-    if (
-      !weekAbsenceMap.get(weekKey) &&
-      !hasAbsenceFormInWeek(violation.date, calendarDays, mergedDays)
-    ) {
+    // Đếm số đơn vắng mặt hiện có + đã tạo trong tuần này
+    const existingAbsenceCount = countAbsenceFormsInWeek(violation.date, calendarDays, mergedDays);
+    const createdAbsenceCount = weekAbsenceCountMap.get(weekKey) || 0;
+    const totalAbsenceCount = existingAbsenceCount + createdAbsenceCount;
+
+    // Tận dụng đơn vắng mặt nếu chưa đủ 2 đơn trong tuần
+    if (totalAbsenceCount < 2) {
       // Ưu tiên tạo đơn vắng mặt cho phần vi phạm lớn nhất (đi muộn hoặc về sớm)
       // Nhưng đơn vắng mặt do đi muộn cần điều kiện: phải về muộn ít nhất bằng số phút đi muộn (làm việc đủ ít nhất 8 tiếng)
 
@@ -279,31 +294,41 @@ export function calculateApplicationsToCreate(
       let lateMinutesToCover = 0;
       let earlyMinutesToCover = 0;
 
-      // Kiểm tra điều kiện tạo đơn vắng mặt do đi muộn
-      if (violation.minutesLate > 0 && violation.timeIn && violation.timeOut) {
-        // Tính tổng thời gian làm việc thực tế
+      // Điều kiện tạo đơn vắng mặt (Thay đổi thời gian làm việc): ngày đó phải làm đủ ít nhất 8 tiếng (tính theo thời gian hiệu quả).
+      // Thời gian hiệu quả = timeOut - timeIn - nghỉ trưa 1h - phút về sớm (nghỉ trưa không tính vào giờ làm).
+      const requiredWorkMinutes = 8 * 60; // 8 tiếng = 480 phút
+      let effectiveWorkMinutes = 0;
+      if (violation.timeIn && violation.timeOut) {
         const timeInTime = dayjs(`2000-01-01 ${violation.timeIn}`, 'YYYY-MM-DD HH:mm');
         const timeOutTime = dayjs(`2000-01-01 ${violation.timeOut}`, 'YYYY-MM-DD HH:mm');
-        const workEndTime = dayjs(`2000-01-01 ${workEnd}`, 'YYYY-MM-DD HH:mm');
-        const actualWorkMinutes = timeOutTime.diff(timeInTime, 'minute');
-        const requiredWorkMinutes = 8 * 60; // 8 tiếng = 480 phút
+        const rawMinutes = timeOutTime.diff(timeInTime, 'minute');
+        effectiveWorkMinutes =
+          rawMinutes - LUNCH_BREAK_MINUTES - (violation.minutesEarly || 0);
+      }
 
-        // Điều kiện: Tổng thời gian làm việc >= 8 tiếng HOẶC về muộn ít nhất bằng số phút đi muộn
+      // Kiểm tra điều kiện tạo đơn vắng mặt do đi muộn: thời gian hiệu quả >= 8h HOẶC về muộn bù giờ
+      if (violation.minutesLate > 0 && violation.timeIn && violation.timeOut) {
+        const timeOutTime = dayjs(`2000-01-01 ${violation.timeOut}`, 'YYYY-MM-DD HH:mm');
+        const workEndTime = dayjs(`2000-01-01 ${workEnd}`, 'YYYY-MM-DD HH:mm');
         const minutesLateAfterWorkEnd = timeOutTime.diff(workEndTime, 'minute');
-        if (actualWorkMinutes >= requiredWorkMinutes || minutesLateAfterWorkEnd >= violation.minutesLate) {
+        const hasEnoughEffectiveWork =
+          effectiveWorkMinutes >= requiredWorkMinutes ||
+          minutesLateAfterWorkEnd >= violation.minutesLate;
+        if (hasEnoughEffectiveWork) {
           canCreateAbsenceForLate = true;
           lateMinutesToCover = Math.min(violation.minutesLate, 60);
         }
       }
 
-      // Kiểm tra điều kiện tạo đơn vắng mặt do về sớm
-      if (violation.minutesEarly > 0 && violation.timeOut) {
-        canCreateAbsenceForEarly = true;
-        earlyMinutesToCover = Math.min(violation.minutesEarly, 60);
+      // Kiểm tra điều kiện tạo đơn vắng mặt do về sớm: thời gian hiệu quả >= 8h (trừ phần về sớm rồi mới so)
+      if (violation.minutesEarly > 0 && violation.timeIn && violation.timeOut) {
+        if (effectiveWorkMinutes >= requiredWorkMinutes) {
+          canCreateAbsenceForEarly = true;
+          earlyMinutesToCover = Math.min(violation.minutesEarly, 60);
+        }
       }
 
-      // Ưu tiên tạo đơn vắng mặt cho phần đi muộn nếu thỏa điều kiện (làm việc đủ 8 tiếng hoặc về muộn ít nhất bằng số phút đi muộn)
-      // Chỉ khi không thể tạo cho phần đi muộn, mới tạo cho phần về sớm
+      // Ưu tiên đơn đi muộn, nếu không thỏa mới tạo đơn về sớm. Một tuần tối đa 2 đơn vắng mặt loại thay đổi thời gian làm việc.
       if (canCreateAbsenceForLate) {
         // Tạo đơn vắng mặt do đi muộn (ưu tiên)
         const timeInTime = dayjs(`2000-01-01 ${violation.timeIn}`, 'YYYY-MM-DD HH:mm');
@@ -321,7 +346,7 @@ export function calculateApplicationsToCreate(
           description: `Đi muộn ${violation.minutesLate} phút`,
         });
 
-        weekAbsenceMap.set(weekKey, true);
+        weekAbsenceCountMap.set(weekKey, createdAbsenceCount + 1);
         absenceFormByDate.set(violation.date, { late: lateMinutesToCover, early: 0 });
         absenceFormTimeByDate.set(violation.date, {
           timeStart: workStart,
@@ -346,7 +371,7 @@ export function calculateApplicationsToCreate(
           description: `Về sớm ${violation.minutesEarly} phút`,
         });
 
-        weekAbsenceMap.set(weekKey, true);
+        weekAbsenceCountMap.set(weekKey, createdAbsenceCount + 1);
         absenceFormByDate.set(violation.date, { late: 0, early: earlyMinutesToCover });
         absenceFormTimeByDate.set(violation.date, {
           timeStart: finalStartTime.format('HH:mm'),
