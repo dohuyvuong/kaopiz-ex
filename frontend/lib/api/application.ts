@@ -4,7 +4,9 @@ import {
   ApplicationFormTypesResponse,
   ApplicationFormReasonsResponse,
   ApprovalAssignmentsResponse,
+  ApproverPreferencesResponse,
 } from '@/lib/types/application';
+import type { ApproverPreferences } from '@/lib/types/approver-preferences';
 import apiClient from './client';
 
 export const applicationApi = {
@@ -48,6 +50,28 @@ export const applicationApi = {
     const response = await apiClient.get<{ data: ApprovalAssignmentsResponse }>(
       `/application/approval-assignments${queryParams}`
     );
+    return response.data.data;
+  },
+
+  /**
+   * Lấy cấu hình người duyệt mặc định
+   */
+  async getApproverPreferences(): Promise<ApproverPreferencesResponse> {
+    const response = await apiClient.get<{
+      data: ApproverPreferencesResponse;
+    }>('/application/approver-preferences');
+    return response.data.data;
+  },
+
+  /**
+   * Lưu cấu hình người duyệt mặc định
+   */
+  async saveApproverPreferences(
+    preferences: ApproverPreferences
+  ): Promise<ApproverPreferencesResponse> {
+    const response = await apiClient.put<{
+      data: ApproverPreferencesResponse;
+    }>('/application/approver-preferences', { preferences });
     return response.data.data;
   },
 

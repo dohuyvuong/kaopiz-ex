@@ -1,13 +1,19 @@
-import { Controller, Get, Post, Body, Query } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Query } from '@nestjs/common';
 import { ApplicationService } from './application.service';
+import { ApproverPreferenceService } from './approver-preference.service';
 import { CreateApplicationFormDto } from './dto/create-application-form.dto';
+import { SaveApproverPreferencesDto } from './dto/approver-preferences.dto';
 import { Auth } from '../auth/decorators';
 import { Token } from '../auth/decorators/token.decorator';
+import { User } from '../auth/decorators/user.decorator';
 
 @Controller('application')
 @Auth('hrm')
 export class ApplicationController {
-  constructor(private readonly applicationService: ApplicationService) {}
+  constructor(
+    private readonly applicationService: ApplicationService,
+    private readonly approverPreferenceService: ApproverPreferenceService,
+  ) {}
 
   /**
    * GET /application/types
@@ -62,6 +68,41 @@ export class ApplicationController {
     return {
       success: true,
       data,
+    };
+  }
+
+  /**
+   * GET /application/approver-preferences
+   * Lấy cấu hình người duyệt mặc định của user
+   * Response: { preferences: [{ typeId, order, approverUserId }, ...] }
+   */
+  @Get('approver-preferences')
+  async getApproverPreferences(@User('id') userId: number) {
+    const preferences = await this.approverPreferenceService.getAll(userId);
+    return {
+      success: true,
+      data: { preferences },
+    };
+  }
+
+  /**
+   * PUT /application/approver-preferences
+   * Lưu cấu hình người duyệt mặc định
+   * Body: { preferences: [{ typeId, order, approverUserId }, ...] }
+   */
+  @Put('approver-preferences')
+  async saveApproverPreferences(
+    @User('id') userId: number,
+    @Body() dto: SaveApproverPreferencesDto,
+  ) {
+    const preferences = dto.preferences ?? [];
+    const data = await this.approverPreferenceService.saveAll(
+      userId,
+      preferences,
+    );
+    return {
+      success: true,
+      data: { preferences: data },
     };
   }
 

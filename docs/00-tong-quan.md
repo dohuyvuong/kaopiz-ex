@@ -115,7 +115,7 @@ frontend/
 │   │   └── checklist.ts
 │   ├── stores/                   # Zustand stores
 │   │   ├── auth-store.ts
-│   │   ├── application-form-store.ts
+│   │   ├── (approver preferences lưu trên server)
 │   │   └── sidebar-store.ts
 │   ├── types/                    # TypeScript types
 │   └── utils/                    # Utility functions
@@ -214,7 +214,7 @@ Chi tiết: [11-background-automation.md](./11-background-automation.md)
 ### Zustand Stores
 
 - **auth-store**: appToken, appRefreshToken, user, systems, isLoading
-- **application-form-store**: approvers (theo typeId, order)
+- **Approver preferences**: Lưu trên server (API /application/approver-preferences)
 - **sidebar-store**: isOpen
 
 Chi tiết: [08-state-management.md](./08-state-management.md)

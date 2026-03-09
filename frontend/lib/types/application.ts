@@ -106,6 +106,12 @@ export interface ApprovalAssignmentsResponse {
   items: ApprovalAssignment[];
 }
 
+import type { ApproverPreferences } from './approver-preferences';
+
+export interface ApproverPreferencesResponse {
+  preferences: ApproverPreferences;
+}
+
 export interface CreateApplicationFormPayload {
   typeId: number; // 1: Nghỉ phép, 2: Vắng mặt
   startDate?: string; // ISO date string

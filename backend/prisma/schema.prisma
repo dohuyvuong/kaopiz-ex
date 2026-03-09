@@ -25,6 +25,23 @@ model User {
   appRefreshTokens       AppRefreshToken[]
   userAutomationSettings UserAutomationSetting[]
   pendingActions         PendingAction[]
+  approverPreferences    ApproverPreference[]
+}
+
+// Cấu hình người duyệt mặc định cho từng loại đơn (typeId) và approvalOrder
+// typeId, approvalOrder: từ HRM application form types (1-based)
+// approverUserId: HRM user ID của người duyệt được chọn
+model ApproverPreference {
+  id             Int      @id @default(autoincrement())
+  userId         Int      // User.id (ChecklistReview)
+  typeId         Int      // HRM application form type ID
+  approvalOrder  Int      // 1-based order (1, 2, 3...)
+  approverUserId Int      // HRM user ID của người duyệt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, typeId, approvalOrder])
+  @@index([userId])
 }
 
 model SystemToken {

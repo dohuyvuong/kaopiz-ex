@@ -1,11 +1,32 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuthStore } from '@/lib/stores/auth-store';
-import { useApplicationFormStore } from '@/lib/stores/application-form-store';
 import { applicationApi } from '@/lib/api/application';
 import {
   ApplicationFormType,
   ApprovalAssignment,
 } from '@/lib/types/application';
+import {
+  ApproverPreferences,
+  ApproverPreferencesHelper,
+} from '@/lib/types/approver-preferences';
+
+const STORAGE_KEY = 'application-form-storage';
+
+/** Lấy preferences cũ từ localStorage để migrate */
+function getLegacyApproversFromStorage(): ApproverPreferences | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const approvers = parsed?.state?.approvers;
+    if (!approvers || typeof approvers !== 'object') return null;
+    const prefs = ApproverPreferencesHelper.fromLegacyMap(approvers);
+    return prefs.length > 0 ? prefs : null;
+  } catch {
+    return null;
+  }
+}
 
 interface UseApproverSettingsReturn {
   types: ApplicationFormType[];
@@ -24,10 +45,10 @@ interface UseApproverSettingsReturn {
 export function useApproverSettings(): UseApproverSettingsReturn {
   const appToken = useAuthStore((state) => state.appToken);
   const userId = useAuthStore((state) => state.user?.id || null);
-  const savedApprovers = useApplicationFormStore((state) => state.approvers);
-  const setApprover = useApplicationFormStore((state) => state.setApprover);
+  const migrationDoneRef = useRef(false);
 
   const [types, setTypes] = useState<ApplicationFormType[]>([]);
+  const [preferences, setPreferences] = useState<ApproverPreferences>([]);
   const [loading, setLoading] = useState(false);
   const [loadingApprovers, setLoadingApprovers] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,11 +56,17 @@ export function useApproverSettings(): UseApproverSettingsReturn {
     Record<number, Record<number, ApprovalAssignment[]>>
   >({});
 
+  const savedApprovers = types.reduce(
+    (acc, type) => {
+      acc[type.id] = ApproverPreferencesHelper.getByTypeId(preferences, type.id);
+      return acc;
+    },
+    {} as Record<number, Record<number, number | null>>,
+  );
+
   // Fetch types
   useEffect(() => {
-    if (!appToken) {
-      return;
-    }
+    if (!appToken) return;
 
     setLoading(true);
     setError(null);
@@ -56,16 +83,42 @@ export function useApproverSettings(): UseApproverSettingsReturn {
             : 'Lỗi khi tải danh sách loại đơn',
         );
       })
-      .finally(() => {
-        setLoading(false);
-      });
+      .finally(() => setLoading(false));
+  }, [appToken]);
+
+  // Fetch approver preferences từ server (+ migrate từ localStorage nếu cần)
+  useEffect(() => {
+    if (!appToken) return;
+
+    const fetchAndMaybeMigrate = async () => {
+      try {
+        const res = await applicationApi.getApproverPreferences();
+        let prefs = res.preferences ?? [];
+
+        if (!migrationDoneRef.current && prefs.length === 0) {
+          const legacy = getLegacyApproversFromStorage();
+          if (legacy && legacy.length > 0) {
+            await applicationApi.saveApproverPreferences(legacy);
+            prefs =
+              (await applicationApi.getApproverPreferences()).preferences ?? [];
+            migrationDoneRef.current = true;
+            localStorage.removeItem(STORAGE_KEY);
+          }
+        }
+
+        setPreferences(prefs);
+      } catch (err) {
+        console.error('Failed to fetch approver preferences:', err);
+        setPreferences([]);
+      }
+    };
+
+    fetchAndMaybeMigrate();
   }, [appToken]);
 
   // Fetch approvers cho từng type
   useEffect(() => {
-    if (!appToken || !userId || types.length === 0) {
-      return;
-    }
+    if (!appToken || !userId || types.length === 0) return;
 
     const fetchApprovers = async () => {
       setLoadingApprovers(true);
@@ -91,7 +144,6 @@ export function useApproverSettings(): UseApproverSettingsReturn {
             }
           }
         }
-
         setApproversMap(map);
       } finally {
         setLoadingApprovers(false);
@@ -102,10 +154,19 @@ export function useApproverSettings(): UseApproverSettingsReturn {
   }, [appToken, userId, types]);
 
   const handleApproverChange = useCallback(
-    (typeId: number, order: number, approverId: number | null) => {
-      setApprover(typeId, order, approverId);
+    async (typeId: number, order: number, approverId: number | null) => {
+      setPreferences((prev) => {
+        const next = ApproverPreferencesHelper.set(
+          prev,
+          typeId,
+          order,
+          approverId,
+        );
+        applicationApi.saveApproverPreferences(next).catch(console.error);
+        return next;
+      });
     },
-    [setApprover],
+    [],
   );
 
   return {

@@ -1,7 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import dayjs from 'dayjs';
 import { useAuthStore } from '@/lib/stores/auth-store';
-import { useApplicationFormStore } from '@/lib/stores/application-form-store';
 import { TimesheetDay } from '@/lib/types/timesheet';
 import { applicationApi } from '@/lib/api/application';
 import {
@@ -13,6 +12,10 @@ import {
   CreateApplicationFormPayload,
   ApprovalAssignment,
 } from '@/lib/types/application';
+import {
+  ApproverPreferences,
+  ApproverPreferencesHelper,
+} from '@/lib/types/approver-preferences';
 
 interface UseAutoCreateApplicationsProps {
   calendarDays: Array<{ date: Date; timesheet: TimesheetDay | null }>;
@@ -59,7 +62,7 @@ export function useAutoCreateApplications({
   summary,
 }: UseAutoCreateApplicationsProps): UseAutoCreateApplicationsReturn {
   const appToken = useAuthStore((state) => state.appToken);
-  const savedApprovers = useApplicationFormStore((state) => state.approvers);
+  const [preferences, setPreferences] = useState<ApproverPreferences>([]);
   const [applications, setApplications] = useState<ApplicationToCreate[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -156,16 +159,24 @@ export function useAutoCreateApplications({
   // Kiểm tra thiếu người duyệt
   const [types, setTypes] = useState<Array<{ id: number; name: string; orderMax: number }>>([]);
 
-  // Fetch types để kiểm tra người duyệt
+  // Fetch types và approver preferences khi có applications
   useEffect(() => {
-    if (applications.length > 0) {
-      applicationApi.getFormTypes().then((response) => {
-        setTypes(response.items || []);
-      }).catch(() => {
-        setTypes([]);
-      });
+    if (applications.length > 0 && appToken) {
+      Promise.all([
+        applicationApi.getFormTypes(),
+        applicationApi.getApproverPreferences(),
+      ])
+        .then(([typesRes, prefsRes]) => {
+          setTypes(typesRes.items || []);
+          setPreferences(prefsRes.preferences ?? []);
+        })
+        .catch(() => {
+          setTypes([]);
+          setPreferences([]);
+        });
     } else {
       setTypes([]);
+      setPreferences([]);
     }
   }, [appToken, applications.length]);
 
@@ -186,7 +197,8 @@ export function useAutoCreateApplications({
       const type = types.find((t) => t.id === typeId);
       if (!type) continue;
 
-      const savedTypeApprovers = savedApprovers[typeId] || {};
+      const savedTypeApprovers =
+        ApproverPreferencesHelper.getByTypeId(preferences, typeId);
       const missingOrders: number[] = [];
 
       for (let order = 1; order <= type.orderMax; order++) {
@@ -205,7 +217,7 @@ export function useAutoCreateApplications({
     }
 
     return missing;
-  }, [appToken, userId, applications, types, savedApprovers]);
+  }, [appToken, userId, applications, types, preferences]);
 
   const calculateApplications = useCallback(() => {
     if (!workingTime) {
@@ -310,8 +322,10 @@ export function useAutoCreateApplications({
           throw new Error(`Không tìm thấy loại đơn với typeId: ${app.typeId}`);
         }
 
-        // Lấy approvers đã lưu từ Redux cho type này
-        const savedTypeApprovers = savedApprovers[app.typeId] || {};
+        const savedTypeApprovers = ApproverPreferencesHelper.getByTypeId(
+          preferences,
+          app.typeId,
+        );
         const applicationApprovals: Array<{ userId: number; order: number }> =
           [];
 
@@ -397,7 +411,7 @@ export function useAutoCreateApplications({
     } finally {
       setLoading(false);
     }
-  }, [appToken, userId, applications, savedApprovers]);
+  }, [appToken, userId, applications, preferences]);
 
   return {
     applications,

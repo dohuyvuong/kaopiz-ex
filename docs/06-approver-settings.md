@@ -2,7 +2,7 @@
 
 ## Tổng quan
 
-Module này cho phép người dùng cấu hình người duyệt mặc định cho từng loại đơn và order. Settings được lưu trong Redux state và persist vào localStorage.
+Module này cho phép người dùng cấu hình người duyệt mặc định cho từng loại đơn và order. Settings được lưu trên **server** (bảng `ApproverPreference`).
 
 ## Component Structure
 
@@ -16,37 +16,30 @@ Component hiển thị danh sách types và approvers cho từng type.
 
 **File**: `frontend/hooks/use-approver-settings.ts`
 
-Hook quản lý logic fetch và lưu approvers.
+Hook quản lý logic fetch và lưu approvers qua API.
 
-## State Management
+## State Management (Server)
 
-### Redux State
+### API Endpoints
 
-**Slice**: `frontend/lib/features/application-form/applicationFormSlice.ts`
+- `GET /application/approver-preferences` - Lấy cấu hình người duyệt
+- `PUT /application/approver-preferences` - Lưu cấu hình (body: `{ preferences: { [typeId]: { [order]: approverUserId } } }`)
 
-**Structure**:
+### Structure (OOP - array of entities)
 
 ```typescript
-{
-  approvers: {
-    [typeId]: {
-      [order]: userId | null
-    }
-  }
+interface ApproverPreference {
+  typeId: number;
+  order: number;
+  approverUserId: number;
 }
+
+type ApproverPreferences = ApproverPreference[];
 ```
 
-**Example**: `{ 1: { 1: 123, 2: 456 }, 2: { 1: 789 } }`
+**Example**: `[{ typeId: 1, order: 1, approverUserId: 123 }, { typeId: 1, order: 2, approverUserId: 456 }]`
 
-**Code reference**: `frontend/lib/features/application-form/applicationFormSlice.ts:5-7`
-
-### Actions
-
-- `setApprover`: Lưu approver cho typeId và order cụ thể
-- `setApprovers`: Lưu tất cả approvers cho một typeId
-- `clearApprovers`: Xóa approvers (có thể xóa một typeId hoặc tất cả)
-
-**Code reference**: `frontend/lib/features/application-form/applicationFormSlice.ts:17-58`
+Helper: `ApproverPreferencesHelper` (get, set, getByTypeId, fromLegacyMap, toLegacyMap)
 
 ## Data Fetching
 
@@ -54,62 +47,26 @@ Hook quản lý logic fetch và lưu approvers.
 
 **API**: `GET /application/types`
 
-**Code reference**: `frontend/hooks/use-approver-settings.ts:47-70`
-
-### Fetch Approvers
+### Fetch Approvers (danh sách có thể chọn)
 
 **API**: `GET /application/approval-assignments?typeId=X&order=Y&userId=Z`
 
-**Logic**: Fetch approvers cho tất cả types và orders
+### Fetch Approver Preferences (đã lưu)
 
-**Code reference**: `frontend/hooks/use-approver-settings.ts:73-111`
+**API**: `GET /application/approver-preferences`
 
-## UI Components
+## Migration từ localStorage
 
-### Type List
-
-- Hiển thị danh sách types
-- Mỗi type có accordion để mở/đóng
-
-### Approver Selection
-
-- Combobox chọn approver cho từng order
-- Hiển thị format: `${user.name} (${user.email})`
-- Loading state khi đang fetch approvers
-
-**Code reference**: `frontend/components/account/ApproverSettings.tsx` (Combobox display)
+Khi user mở Approver Settings lần đầu sau khi migrate, nếu API trả về rỗng và có data cũ trong localStorage (`application-form-storage`), hook sẽ tự động gửi data lên server để migrate và xóa localStorage.
 
 ## Save Logic
 
 ### handleApproverChange
 
-**Function**: `handleApproverChange`
-
-Lưu approver vào Redux state khi user thay đổi.
-
-**Code reference**: `frontend/hooks/use-approver-settings.ts:113-118`
-
-```typescript
-const handleApproverChange = useCallback(
-  (typeId: number, order: number, approverId: number | null) => {
-    dispatch(setApprover({ typeId, order, userId: approverId }));
-  },
-  [dispatch],
-);
-```
-
-## Persistence
-
-### Redux Persist
-
-Settings được persist vào localStorage với key `applicationForm`.
-
-**Code reference**: `frontend/lib/store.ts:23-29`
+Khi user thay đổi approver, hook gọi `applicationApi.saveApproverPreferences()` để lưu lên server.
 
 ## Usage in Form Creation
 
 ### Load Saved Approvers
 
-Khi tạo đơn, hook `useCreateApplicationForm` load saved approvers từ Redux state và tự động chọn.
-
-**Code reference**: `frontend/hooks/use-create-application-form.ts:211-239`
+Khi tạo đơn, hook `useCreateApplicationForm` fetch approver preferences từ API và tự động chọn.

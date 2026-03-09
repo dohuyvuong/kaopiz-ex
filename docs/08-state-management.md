@@ -64,53 +64,19 @@ useAuthStore.getState().clearAuth();
 - **Auto-persisted**: Changes automatically saved to localStorage
 - **Auto-hydrated**: State restored on app load
 
-### 2. Application Form Store
+### 2. Approver Preferences (Server)
 
-**File**: `frontend/lib/stores/application-form-store.ts`
+**Lưu ý**: Approver preferences (cấu hình người duyệt mặc định) đã được migrate từ client store (localStorage) sang server. Dữ liệu được lưu trong bảng `ApproverPreference` và truy cập qua API:
 
-#### State Structure
+- `GET /application/approver-preferences` - Lấy cấu hình
+- `PUT /application/approver-preferences` - Lưu cấu hình
 
-```typescript
-interface ApplicationFormState {
-  // State
-  approvers: Record<number, Record<number, number | null>>;
-
-  // Actions
-  setApprover: (typeId: number, order: number, userId: number | null) => void;
-  setApprovers: (typeId: number, approvers: Record<number, number | null>) => void;
-  clearApprovers: (typeId?: number) => void;
-}
-```
-
-#### Structure Example
+#### Format
 
 ```typescript
-{
-  approvers: {
-    1: { 1: 123, 2: 456 },  // Type 1: Order 1 = User 123, Order 2 = User 456
-    2: { 1: 789 }           // Type 2: Order 1 = User 789
-  }
-}
+// { [typeId]: { [order]: approverUserId } }
+{ 1: { 1: 123, 2: 456 }, 2: { 1: 789 } }
 ```
-
-#### Usage
-
-```typescript
-// Select state
-const approvers = useApplicationFormStore((state) => state.approvers);
-
-// Call actions
-const setApprover = useApplicationFormStore((state) => state.setApprover);
-const clearApprovers = useApplicationFormStore((state) => state.clearApprovers);
-
-setApprover(1, 1, 123); // Type 1, Order 1, User 123
-clearApprovers(1); // Clear approvers for Type 1
-```
-
-#### Persistence
-
-- **localStorage key**: `'application-form-storage'`
-- **Auto-persisted**: Changes automatically saved to localStorage
 
 ### 3. Sidebar Store
 
@@ -209,10 +175,9 @@ Token available everywhere
 ```
 User selects approver →
 handleApproverChange() →
-setApprover(typeId, order, userId) →
-Store updates →
-Persist to localStorage →
-State available on next form creation
+applicationApi.saveApproverPreferences() →
+Server lưu vào DB →
+State available on next form creation (fetch từ API)
 ```
 
 ### Example 3: Token Refresh

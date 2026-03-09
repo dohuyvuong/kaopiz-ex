@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuthStore } from '@/lib/stores/auth-store';
-import { useApplicationFormStore } from '@/lib/stores/application-form-store';
 import { applicationApi } from '@/lib/api/application';
 import {
   CreateApplicationFormPayload,
@@ -8,6 +7,10 @@ import {
   ApplicationFormReason,
   ApprovalAssignment,
 } from '@/lib/types/application';
+import {
+  ApproverPreferences,
+  ApproverPreferencesHelper,
+} from '@/lib/types/approver-preferences';
 import { TimesheetDay } from '@/lib/types/timesheet';
 import { DayDetailApplicationForm } from '@/lib/types/timesheet-day-detail';
 import dayjs from 'dayjs';
@@ -79,8 +82,7 @@ export function useCreateApplicationForm({
   userId,
 }: UseCreateApplicationFormProps): UseCreateApplicationFormReturn {
   const appToken = useAuthStore((state) => state.appToken);
-  const savedApprovers = useApplicationFormStore((state) => state.approvers);
-  const setApprover = useApplicationFormStore((state) => state.setApprover);
+  const [, setPreferences] = useState<ApproverPreferences>([]);
 
   const [typeId, setTypeId] = useState<number>(2);
   const [reasonId, setReasonId] = useState<number | null>(null);
@@ -192,63 +194,61 @@ export function useCreateApplicationForm({
     return type.orderMax;
   }, []);
 
-  // Fetch người duyệt khi typeId thay đổi
+  // Fetch approver preferences + người duyệt khi mở form / typeId thay đổi
   useEffect(() => {
-    if (open && appToken && typeId && selectedType && userId) {
-      const fetchApprovers = async () => {
-        setLoadingApprovers(true);
-        try {
-          const approverCount = getApproverCount(selectedType);
-          const approversArray: ApprovalAssignment[][] = [];
-          const approverIdsArray: (number | null)[] = [];
-
-          // Lấy saved approvers cho typeId hiện tại (chỉ đọc một lần)
-          const currentTypeApprovers = savedApprovers[typeId] || {};
-
-          // Loop từ 0 đến approverCount - 1
-          for (let order = 0; order < approverCount; order++) {
-            // API dùng 1-based order, nên order + 1
-            const apiOrder = order + 1;
-            const approversResponse =
-              await applicationApi.getApprovalAssignments(
-                typeId,
-                apiOrder,
-                userId,
-              );
-            approversArray.push(approversResponse.items || []);
-
-            // Load người duyệt đã lưu từ Redux state
-            const savedApproverId = currentTypeApprovers[apiOrder] ?? null;
-            if (savedApproverId) {
-              const exists = approversResponse.items?.some(
-                (a) => a.userId === savedApproverId,
-              );
-              if (exists) {
-                approverIdsArray[order] = savedApproverId;
-              } else {
-                approverIdsArray[order] = null;
-              }
-            } else {
-              approverIdsArray[order] = null;
-            }
-          }
-
-          setApprovers(approversArray);
-          setApproverIds(approverIdsArray);
-        } catch (err) {
-          console.error('Failed to fetch approvers:', err);
-          setApprovers([]);
-          setApproverIds([]);
-        } finally {
-          setLoadingApprovers(false);
-        }
-      };
-
-      fetchApprovers();
-    } else {
+    if (!open || !appToken || !typeId || !selectedType || !userId) {
       setApprovers([]);
       setApproverIds([]);
+      return;
     }
+
+    const fetchAll = async () => {
+      setLoadingApprovers(true);
+      try {
+        const [prefsRes, ...approverResponses] = await Promise.all([
+          applicationApi.getApproverPreferences(),
+          ...Array.from({ length: getApproverCount(selectedType) }, (_, order) =>
+            applicationApi.getApprovalAssignments(
+              typeId,
+              order + 1,
+              userId,
+            ),
+          ),
+        ]);
+
+        const prefs = prefsRes.preferences ?? [];
+        setPreferences(prefs);
+
+        const currentTypeApprovers =
+          ApproverPreferencesHelper.getByTypeId(prefs, typeId);
+        const approversArray: ApprovalAssignment[][] = [];
+        const approverIdsArray: (number | null)[] = [];
+
+        approverResponses.forEach((response, order) => {
+          const apiOrder = order + 1;
+          const items = response.items || [];
+          approversArray.push(items);
+
+          const savedApproverId = currentTypeApprovers[apiOrder] ?? null;
+          if (savedApproverId && items.some((a) => a.userId === savedApproverId)) {
+            approverIdsArray[order] = savedApproverId;
+          } else {
+            approverIdsArray[order] = null;
+          }
+        });
+
+        setApprovers(approversArray);
+        setApproverIds(approverIdsArray);
+      } catch (err) {
+        console.error('Failed to fetch approvers:', err);
+        setApprovers([]);
+        setApproverIds([]);
+      } finally {
+        setLoadingApprovers(false);
+      }
+    };
+
+    fetchAll();
   }, [typeId, open, appToken, selectedType, userId, getApproverCount]);
 
   // Reset approverIds khi typeId thay đổi
@@ -273,16 +273,21 @@ export function useCreateApplicationForm({
         return newIds;
       });
 
-      // Lưu ngay vào store khi user thay đổi
       if (typeId && selectedType) {
-        setApprover(
-          typeId,
-          order + 1, // API dùng 1-based order
-          approverId,
-        );
+        const apiOrder = order + 1;
+        setPreferences((prev) => {
+          const next = ApproverPreferencesHelper.set(
+            prev,
+            typeId,
+            apiOrder,
+            approverId,
+          );
+          applicationApi.saveApproverPreferences(next).catch(console.error);
+          return next;
+        });
       }
     },
-    [typeId, selectedType, setApprover],
+    [typeId, selectedType],
   );
 
   // Tính toán thời gian tự động dựa trên typeId và calendarDay
