@@ -7,6 +7,7 @@ import {
   Param,
   UseGuards,
   Logger,
+  BadRequestException,
 } from '@nestjs/common';
 import { AutomationService } from './automation.service';
 import { UpdateAutomationSettingDto } from './dto/automation-setting.dto';
@@ -80,6 +81,19 @@ export class AutomationController {
   async getAllActions(@User('id') userId: number) {
     this.logger.log(`Getting all actions for user ${userId}`);
     return this.automationService.getAllActions(userId);
+  }
+
+  /**
+   * GET /api/automation/actions/:id
+   * Get one action by id (chỉ trả về nếu thuộc user, dùng cho trang approve/reject)
+   */
+  @Get('actions/:id')
+  async getActionById(@User('id') userId: number, @Param('id') id: string) {
+    const actionId = parseInt(id, 10);
+    if (Number.isNaN(actionId)) {
+      throw new BadRequestException('Invalid action id');
+    }
+    return this.automationService.getActionById(userId, actionId);
   }
 
   /**

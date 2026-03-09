@@ -13,16 +13,21 @@ function getAppRefreshToken(): string | null {
   return useAuthStore.getState().appRefreshToken;
 }
 
-function updateAppToken(newToken: string) {
+function updateAuthFromRefresh(data: {
+  appToken: string;
+  expiresIn: number;
+  appRefreshToken?: string;
+}) {
   useAuthStore.getState().updateAppToken({
-    appToken: newToken,
-    expiresIn: 3600, // Default 1 hour, will be updated by actual response
+    appToken: data.appToken,
+    expiresIn: data.expiresIn,
+    appRefreshToken: data.appRefreshToken,
   });
 }
 
 function clearAuthAndRedirect() {
   useAuthStore.getState().clearAuth();
-  
+
   // Redirect to login page
   if (typeof window !== 'undefined') {
     window.location.href = '/login';
@@ -125,18 +130,21 @@ apiClient.interceptors.response.use(
 
     try {
       const refreshResponse = await authApi.refreshToken(refreshToken);
-      const newToken = refreshResponse.appToken;
 
-      // Update store with new token
-      updateAppToken(newToken);
+      // Update store with new appToken, expiresIn and appRefreshToken (nếu backend rotate)
+      updateAuthFromRefresh({
+        appToken: refreshResponse.appToken,
+        expiresIn: refreshResponse.expiresIn,
+        appRefreshToken: refreshResponse.appRefreshToken,
+      });
 
       // Update original request with new token
       if (originalRequest.headers) {
-        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        originalRequest.headers.Authorization = `Bearer ${refreshResponse.appToken}`;
       }
 
       // Process queued requests
-      processQueue(null, newToken);
+      processQueue(null, refreshResponse.appToken);
       isRefreshing = false;
 
       // Retry original request

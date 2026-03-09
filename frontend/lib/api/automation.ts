@@ -42,6 +42,14 @@ export const automationApi = {
   },
 
   /**
+   * Get one action by id (để hiển thị chi tiết trang approve/reject; 401 nếu chưa đăng nhập)
+   */
+  getActionById: async (actionId: number): Promise<PendingAction> => {
+    const response = await apiClient.get(`/automation/actions/${actionId}`);
+    return response.data;
+  },
+
+  /**
    * Get automation setting for a specific jobType
    */
   getSetting: async (jobType: string): Promise<AutomationSetting> => {

@@ -1,7 +1,14 @@
+export interface InlineButton {
+  text: string;
+  url: string;
+}
+
 export interface NotificationPayload {
   title: string;
   message: string;
   actionUrl?: string;
+  /** Inline buttons (e.g. Approve / Reject). Rendered as URL buttons in Telegram. */
+  inlineButtons?: InlineButton[];
   metadata?: Record<string, unknown>;
 }
 

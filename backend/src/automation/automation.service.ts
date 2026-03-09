@@ -221,6 +221,22 @@ export class AutomationService {
   }
 
   /**
+   * Get one pending action by id (chỉ trả về nếu thuộc user)
+   */
+  async getActionById(userId: number, actionId: number) {
+    const action = await this.prisma.pendingAction.findFirst({
+      where: {
+        id: actionId,
+        userId,
+      },
+    });
+    if (!action) {
+      throw new NotFoundException('Pending action not found');
+    }
+    return this.mapActions([action])[0];
+  }
+
+  /**
    * Approve a pending action and execute it
    */
   async approvePendingAction(userId: number, actionId: number) {

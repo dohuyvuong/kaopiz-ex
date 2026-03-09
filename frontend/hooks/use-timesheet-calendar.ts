@@ -6,6 +6,7 @@ import { useAuthStore } from '@/lib/stores/auth-store';
 import { TimesheetDay } from '@/lib/types/timesheet';
 import { TimesheetDayDetailResponse } from '@/lib/types/timesheet-day-detail';
 import { timesheetApi } from '@/lib/api/timesheet';
+import { calculateMinutesFromForms } from '@/lib/utils/auto-create-applications';
 
 // Setup dayjs plugins
 dayjs.extend(utc);
@@ -219,20 +220,44 @@ export function useTimesheetCalendar(): UseTimesheetCalendarReturn {
   const weekDayLabels = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 
   // Tính toán estimated summary (nếu các đơn chưa approve được approve)
+  // Trừ theo số phút thực tế trong đơn (trackingTimes), không trừ cả ngày.
   const estimatedSummary = useMemo(() => {
     if (!summary) return null;
 
     let totalMinutesLate = summary.summary.minutesLate;
     let totalMinutesEarly = summary.summary.minutesEarly;
 
-    // Tính toán lại dựa trên các ngày có đơn chưa approve
     mergedDays.forEach((day) => {
-      if (day.hasPendingForms) {
-        // Nếu có đơn chưa approve, trừ đi muộn/về sớm của ngày đó khỏi tổng
-        // (vì nếu đơn được approve thì sẽ không bị tính phạt)
-        totalMinutesLate = Math.max(0, totalMinutesLate - day.minutesLate);
-        totalMinutesEarly = Math.max(0, totalMinutesEarly - day.minutesEarly);
-      }
+      if (!day.hasPendingForms || !day.date) return;
+
+      const dateStr = dayjs(day.date).format('YYYY-MM-DD');
+      const originalTimesheet = summary.timelines.find(
+        (t) => t.date && dayjs(t.date).format('YYYY-MM-DD') === dateStr,
+      );
+      const approvedFormIds = new Set(
+        (originalTimesheet?.approvedApplicationForms || []).map((f) => f.id),
+      );
+      const pendingForms = (day.approvedApplicationForms || []).filter(
+        (form) =>
+          (form.typeId === 1 || form.typeId === 2) &&
+          !approvedFormIds.has(form.id),
+      );
+      if (pendingForms.length === 0) return;
+
+      const pendingMinutes = calculateMinutesFromForms(pendingForms);
+      const dayTotal = (day.minutesLate || 0) + (day.minutesEarly || 0);
+      if (dayTotal <= 0) return;
+
+      const lateRatio = (day.minutesLate || 0) / dayTotal;
+      const earlyRatio = (day.minutesEarly || 0) / dayTotal;
+      totalMinutesLate = Math.max(
+        0,
+        totalMinutesLate - Math.round(pendingMinutes * lateRatio),
+      );
+      totalMinutesEarly = Math.max(
+        0,
+        totalMinutesEarly - Math.round(pendingMinutes * earlyRatio),
+      );
     });
 
     return {

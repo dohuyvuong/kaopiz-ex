@@ -43,11 +43,40 @@ export class TelegramNotificationService implements INotificationService {
     try {
       const message = this.formatMessage(payload);
 
-      const response = await axios.post(`${this.apiUrl}/sendMessage`, {
+      const body: Record<string, unknown> = {
         chat_id: chatId,
         text: message,
         parse_mode: 'HTML',
-      });
+      };
+
+      // Telegram không chấp nhận URL localhost trong nút inline → bỏ qua buttons nếu có localhost
+      const hasLocalhostUrl =
+        payload.inlineButtons?.some(
+          (btn) =>
+            btn.url.includes('localhost') ||
+            btn.url.startsWith('http://127.0.0.1'),
+        ) ?? false;
+
+      if (
+        payload.inlineButtons &&
+        payload.inlineButtons.length > 0 &&
+        !hasLocalhostUrl
+      ) {
+        body.reply_markup = JSON.stringify({
+          inline_keyboard: [
+            payload.inlineButtons.map((btn) => ({
+              text: btn.text,
+              url: btn.url,
+            })),
+          ],
+        });
+      } else if (hasLocalhostUrl) {
+        this.logger.warn(
+          'APP_URL đang là localhost. Telegram không hỗ trợ nút inline với URL localhost, đã bỏ qua nút Duyệt/Từ chối. Để dùng nút, cấu hình APP_URL là URL public (VD: https://your-app.example.com).',
+        );
+      }
+
+      const response = await axios.post(`${this.apiUrl}/sendMessage`, body);
 
       if (response.data.ok) {
         this.logger.log(`Notification sent to Telegram chat ${chatId}`);

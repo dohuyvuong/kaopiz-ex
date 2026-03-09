@@ -144,9 +144,10 @@ export class ChecklistSchedulerService {
       `Created pending action ${pendingAction.id} for user ${userId}`,
     );
 
-    // Send notification
+    // Send notification (với nút Duyệt / Từ chối trên Telegram)
     const config = this.configService.getConfig();
     const approveUrl = `${config.appUrl}/automation/approve/${pendingAction.id}`;
+    const rejectUrl = `${config.appUrl}/automation/reject/${pendingAction.id}`;
 
     await this.notificationService.sendPendingActionNotification(
       setting.notificationChannel,
@@ -155,6 +156,7 @@ export class ChecklistSchedulerService {
       checklists.length,
       setting.autoApproveAfterMinutes,
       approveUrl,
+      rejectUrl,
     );
 
     this.logger.log(`Sent notification to user ${userId}`);

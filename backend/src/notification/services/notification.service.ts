@@ -71,7 +71,7 @@ export class NotificationService {
   }
 
   /**
-   * Send notification about pending action
+   * Send notification about pending action (với nút Duyệt / Từ chối trên Telegram)
    */
   async sendPendingActionNotification(
     channel: string,
@@ -80,6 +80,7 @@ export class NotificationService {
     actionCount: number,
     autoApproveMinutes: number,
     approveUrl: string,
+    rejectUrl: string,
   ): Promise<void> {
     const actionTypeLabel =
       actionType === 'auto-review-checklist'
@@ -90,6 +91,10 @@ export class NotificationService {
       title: '🔔 Có hành động chờ xác nhận',
       message: `Bạn có <b>${actionCount} ${actionTypeLabel}</b>.\n\nVui lòng xác nhận trong <b>${autoApproveMinutes} phút</b>, nếu không hệ thống sẽ tự động thực hiện.`,
       actionUrl: approveUrl,
+      inlineButtons: [
+        { text: '✅ Duyệt', url: approveUrl },
+        { text: '❌ Từ chối', url: rejectUrl },
+      ],
     });
   }
 }
