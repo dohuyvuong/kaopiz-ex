@@ -1,4 +1,12 @@
-# Build stage
+# Deps stage: cache node_modules theo package.json + yarn.lock
+FROM node:20-alpine AS deps
+
+WORKDIR /app
+
+COPY package.json yarn.lock ./
+RUN yarn install --frozen-lockfile
+
+# Build stage: dùng deps đã cache để build Next.js
 FROM node:20-alpine AS builder
 
 WORKDIR /app
@@ -7,12 +15,12 @@ ARG NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 
 COPY package.json yarn.lock ./
-RUN yarn install --frozen-lockfile
+COPY --from=deps /app/node_modules ./node_modules
 
 COPY . .
 RUN yarn build
 
-# Production stage
+# Production stage: dùng output standalone của Next.js
 FROM node:20-alpine AS runner
 
 WORKDIR /app
