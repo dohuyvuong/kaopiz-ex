@@ -9,17 +9,13 @@ export class AppConfigService {
   getConfig(): AppConfig {
     return {
       // Microsoft Entra ID (Azure AD) - Cho Ksystem
-      azureTenantId: this.configService.get<string>('AZURE_TENANT_ID') || '',
       azureClientId: this.configService.get<string>('AZURE_CLIENT_ID') || '',
-      azureClientSecret: this.configService.get<string>('AZURE_CLIENT_SECRET'),
       azureRedirectUri:
         this.configService.get<string>('AZURE_REDIRECT_URI') || '',
       azureScope:
         this.configService.get<string>('AZURE_SCOPE') ||
         'user.read openid profile offline_access',
       azureAuthority: this.configService.get<string>('AZURE_AUTHORITY') || '',
-      azureTokenEndpoint:
-        this.configService.get<string>('AZURE_TOKEN_ENDPOINT') || '',
 
       // Ksystem API
       ksystemSocialLoginEndpoint: this.configService.get<string>(

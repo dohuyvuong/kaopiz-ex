@@ -1,5 +1,5 @@
 {
-  "name": "checklist-review-service",
+  "name": "kaopiz-ex-backend",
   "version": "1.0.0",
   "description": "KaopizEX để gọi APIs của Kaopiz với JWT Token từ SSO",
   "author": "",

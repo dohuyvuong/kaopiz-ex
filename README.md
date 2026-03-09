@@ -5,25 +5,25 @@ Monorepo chứa backend và frontend cho hệ thống công cụ nội bộ Kaop
 ## Cấu trúc
 
 ```
-ChecklistReview/
+kaopiz-ex/
 ├── backend/          # NestJS Backend API
 │   ├── src/
 │   ├── package.json
 │   └── ...
-├── frontend/         # NextJS Frontend (sẽ tạo sau)
+├── frontend/         # Next.js Frontend
 │   └── ...
 └── README.md
 ```
 
 ## Backend
 
-Backend service được xây dựng với NestJS, cung cấp API để tự động review checklist.
+Backend service được xây dựng với NestJS, cung cấp API cho các tính năng: Checklist Review, Timesheet, tự động hóa, v.v.
 
 Xem chi tiết trong [backend/README.md](./backend/README.md)
 
 ## Frontend
 
-Frontend sẽ được xây dựng với NextJS (sẽ tạo sau).
+Frontend được xây dựng với Next.js. Xem [frontend/README.md](./frontend/README.md).
 
 ## Development
 

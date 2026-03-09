@@ -1,0 +1,63 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-kaopiz_ex}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kaopiz_ex_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-kaopiz_ex}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kaopiz_ex} -d ${POSTGRES_DB:-kaopiz_ex}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5432:5432"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-kaopiz_ex}:${POSTGRES_PASSWORD:-kaopiz_ex_secret}@db:5432/${POSTGRES_DB:-kaopiz_ex}
+      PORT: ${PORT:-8000}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      AZURE_CLIENT_ID: ${AZURE_CLIENT_ID:-}
+      AZURE_REDIRECT_URI: ${AZURE_REDIRECT_URI:-http://localhost:3000/auth/callback}
+      AZURE_SCOPE: ${AZURE_SCOPE:-user.read openid profile offline_access}
+      AZURE_AUTHORITY: ${AZURE_AUTHORITY:-}
+      KSYSTEM_API_BASE_URL: ${KSYSTEM_API_BASE_URL:-https://ksystem.kaopiz.com/api}
+      KSYSTEM_SOCIAL_LOGIN_ENDPOINT: ${KSYSTEM_SOCIAL_LOGIN_ENDPOINT:-https://ksystem.kaopiz.com/api/sociallogin/microsoft}
+      KSYSTEM_OAUTH_BASE_URL: ${KSYSTEM_OAUTH_BASE_URL:-https://ksystem.kaopiz.com}
+      KSYSTEM_OAUTH_CLIENT_ID: ${KSYSTEM_OAUTH_CLIENT_ID:-7}
+      KSYSTEM_OAUTH_REDIRECT_URI: ${KSYSTEM_OAUTH_REDIRECT_URI:-https://api.hrm.kaopiz.com/api/auth/callback}
+      HRM_API_BASE_URL: ${HRM_API_BASE_URL:-https://api.hrm.kaopiz.com/api}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres_data:

@@ -1,12 +1,9 @@
 export interface AppConfig {
   // Microsoft Entra ID (Azure AD) - Cho Ksystem
-  azureTenantId: string;
   azureClientId: string;
-  azureClientSecret?: string;
   azureRedirectUri: string;
   azureScope: string;
   azureAuthority: string;
-  azureTokenEndpoint: string;
 
   // Ksystem API
   ksystemSocialLoginEndpoint?: string;

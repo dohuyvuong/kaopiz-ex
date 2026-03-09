@@ -18,13 +18,10 @@ Sau đó điền các giá trị thực tế vào file `.env`.
 ### Microsoft Entra ID (Azure AD) - Cho Ksystem
 Các biến này dùng để đăng nhập vào Ksystem thông qua Microsoft SSO.
 
-- `AZURE_TENANT_ID`: Tenant ID của Microsoft Entra ID
 - `AZURE_CLIENT_ID`: Client ID của ứng dụng trong Azure AD
-- `AZURE_CLIENT_SECRET`: Client Secret (optional, không cần cho public client)
 - `AZURE_REDIRECT_URI`: Redirect URI sau khi đăng nhập (phải khớp với cấu hình trong Azure AD)
 - `AZURE_SCOPE`: Các quyền cần yêu cầu (mặc định: `user.read openid profile offline_access`)
-- `AZURE_AUTHORITY`: Authority URL của Microsoft Entra ID
-- `AZURE_TOKEN_ENDPOINT`: Token endpoint URL
+- `AZURE_AUTHORITY`: Authority URL của Microsoft Entra ID (ví dụ: `https://login.microsoftonline.com/<tenant_id>/v2.0`)
 
 ### Ksystem API
 - `KSYSTEM_API_BASE_URL`: Base URL của Ksystem API (mặc định: `https://ksystem.kaopiz.com/api`)

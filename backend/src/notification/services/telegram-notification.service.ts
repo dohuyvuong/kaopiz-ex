@@ -113,7 +113,7 @@ export class TelegramNotificationService implements INotificationService {
   async testNotification(chatId: string): Promise<void> {
     await this.sendNotification(chatId, {
       title: '🧪 Test Notification',
-      message: 'This is a test notification from ChecklistReview system.',
+      message: 'This is a test notification from Kaopiz-ex.',
     });
   }
 }
