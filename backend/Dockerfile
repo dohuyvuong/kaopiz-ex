@@ -33,6 +33,7 @@ FROM node:20-alpine AS runner
 
 WORKDIR /app
 ENV NODE_ENV=production
+ENV PORT=8000
 
 # Prisma trên Alpine cần OpenSSL + libc compat ở runtime
 RUN apk add --no-cache openssl libc6-compat
@@ -48,7 +49,7 @@ COPY --from=builder /app/prisma ./prisma/
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
-EXPOSE 8000
+EXPOSE ${PORT}
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["node", "dist/main.js"]

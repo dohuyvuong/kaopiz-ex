@@ -1,21 +1,27 @@
-BACKEND_IMAGE ?= kaopiz-ex-backend:local
-FRONTEND_IMAGE ?= kaopiz-ex-frontend:local
-IMAGE_PLATFORM ?= linux/amd64
-NEXT_PUBLIC_API_BASE_URL ?= https://vngou.space/api
+# Load .env nếu tồn tại; biến trong .env không ghi đè biến đã set từ shell
+-include .env
+export
 
-.PHONY: build-backend build-frontend build up down logs
+# Guard: báo lỗi nếu biến chưa được set (từ .env hoặc command)
+guard-%:
+	@[ -n "${$*}" ] || (echo "ERROR: $* is not set. Set it in .env or run: make $@ $*=<value>"; exit 1)
 
-build-backend:
+.PHONY: build-backend build-frontend build-nginx build up down logs
+
+build-backend: guard-BACKEND_IMAGE guard-IMAGE_PLATFORM
 	docker build --platform=$(IMAGE_PLATFORM) -t $(BACKEND_IMAGE) ./backend
 
-build-frontend:
+build-frontend: guard-FRONTEND_IMAGE guard-IMAGE_PLATFORM guard-NEXT_PUBLIC_API_BASE_URL
 	docker build \
-		 --platform=$(IMAGE_PLATFORM) \
+		--platform=$(IMAGE_PLATFORM) \
 		--build-arg NEXT_PUBLIC_API_BASE_URL=$(NEXT_PUBLIC_API_BASE_URL) \
 		-t $(FRONTEND_IMAGE) \
 		./frontend
 
-build: build-backend build-frontend
+build-nginx: guard-NGINX_IMAGE
+	docker build --platform=$(IMAGE_PLATFORM) -t $(NGINX_IMAGE) ./nginx
+
+build: build-backend build-frontend build-nginx
 
 up:
 	docker compose up -d

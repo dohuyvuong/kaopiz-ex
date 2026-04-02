@@ -1,76 +1,89 @@
 services:
-  db:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-kaopiz_ex}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kaopiz_ex_secret}
-      POSTGRES_DB: ${POSTGRES_DB:-kaopiz_ex}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kaopiz_ex} -d ${POSTGRES_DB:-kaopiz_ex}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    ports:
-      - "5432:5432"
-
   backend:
-    image: ${BACKEND_IMAGE:-kaopiz-ex-backend:local}
+    image: ${BACKEND_IMAGE}
+    hostname: ${BACKEND_HOST}
     restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-kaopiz_ex}:${POSTGRES_PASSWORD:-kaopiz_ex_secret}@db:5432/${POSTGRES_DB:-kaopiz_ex}
-      PORT: ${PORT:-8000}
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
-      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
-      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
-      APP_URL: ${APP_URL:-http://localhost:3000}
-      AZURE_CLIENT_ID: ${AZURE_CLIENT_ID:-}
-      AZURE_REDIRECT_URI: ${AZURE_REDIRECT_URI:-http://localhost:3000/auth/callback}
-      AZURE_SCOPE: ${AZURE_SCOPE:-user.read openid profile offline_access}
-      AZURE_AUTHORITY: ${AZURE_AUTHORITY:-}
-      KSYSTEM_API_BASE_URL: ${KSYSTEM_API_BASE_URL:-https://ksystem.kaopiz.com/api}
-      KSYSTEM_SOCIAL_LOGIN_ENDPOINT: ${KSYSTEM_SOCIAL_LOGIN_ENDPOINT:-https://ksystem.kaopiz.com/api/sociallogin/microsoft}
-      KSYSTEM_OAUTH_BASE_URL: ${KSYSTEM_OAUTH_BASE_URL:-https://ksystem.kaopiz.com}
-      KSYSTEM_OAUTH_CLIENT_ID: ${KSYSTEM_OAUTH_CLIENT_ID:-7}
-      KSYSTEM_OAUTH_REDIRECT_URI: ${KSYSTEM_OAUTH_REDIRECT_URI:-https://api.hrm.kaopiz.com/api/auth/callback}
-      HRM_API_BASE_URL: ${HRM_API_BASE_URL:-https://api.hrm.kaopiz.com/api}
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      PORT: ${BACKEND_PORT}
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
+      APP_URL: ${APP_URL}
+      AZURE_CLIENT_ID: ${AZURE_CLIENT_ID}
+      AZURE_REDIRECT_URI: ${AZURE_REDIRECT_URI}
+      AZURE_SCOPE: ${AZURE_SCOPE}
+      AZURE_AUTHORITY: ${AZURE_AUTHORITY}
+      KSYSTEM_API_BASE_URL: ${KSYSTEM_API_BASE_URL}
+      KSYSTEM_SOCIAL_LOGIN_ENDPOINT: ${KSYSTEM_SOCIAL_LOGIN_ENDPOINT}
+      KSYSTEM_OAUTH_BASE_URL: ${KSYSTEM_OAUTH_BASE_URL}
+      KSYSTEM_OAUTH_CLIENT_ID: ${KSYSTEM_OAUTH_CLIENT_ID}
+      KSYSTEM_OAUTH_REDIRECT_URI: ${KSYSTEM_OAUTH_REDIRECT_URI}
+      HRM_API_BASE_URL: ${HRM_API_BASE_URL}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
 
   frontend:
-    image: ${FRONTEND_IMAGE:-kaopiz-ex-frontend:local}
+    image: ${FRONTEND_IMAGE}
+    hostname: ${FRONTEND_HOST}
     restart: unless-stopped
     depends_on:
       - backend
     environment:
-      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://nginx}
+      PORT: ${FRONTEND_PORT}
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
 
   nginx:
-    image: nginx:alpine
+    image: ${NGINX_IMAGE}
     restart: unless-stopped
     depends_on:
       - frontend
       - backend
     volumes:
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./nginx/certbot:/var/www/certbot
       - certbot-etc:/etc/letsencrypt
+    environment:
+      PRIMARY_DOMAIN: ${PRIMARY_DOMAIN}
+      EXTRA_DOMAINS: ${EXTRA_DOMAINS}
+      CERTBOT_EMAIL: ${CERTBOT_EMAIL}
+      CERTBOT_STAGING: ${CERTBOT_STAGING}
+      FRONTEND_HOST: ${FRONTEND_HOST}
+      FRONTEND_PORT: ${FRONTEND_PORT}
+      BACKEND_HOST: ${BACKEND_HOST}
+      BACKEND_PORT: ${BACKEND_PORT}
     ports:
       - "80:80"
       - "443:443"
 
-  certbot:
-    image: certbot/certbot
-    restart: unless-stopped
-    volumes:
-      - certbot-etc:/etc/letsencrypt
-      - ./nginx/certbot:/var/www/certbot
-    entrypoint: /bin/sh -c "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot; sleep 12h & wait $!; done"
+  keep-alive:
+    image: alpine:3.23
+    environment:
+      PRIMARY_DOMAIN: ${PRIMARY_DOMAIN}
+    restart: always
+    entrypoint: >
+      /bin/sh -c "
+        if [ -z \"$$PRIMARY_DOMAIN\" ]; then
+          echo 'PRIMARY_DOMAIN is empty. Exiting.';
+          exit 1;
+        fi;
+        url=\"https://$$PRIMARY_DOMAIN\";
+        interval=60;
+        while true; do
+          start=$$(date +%s);
+          wget -q -T 15 -O /dev/null \"$$url\" || true;
+          echo \"Ping sent to $$url at $$(date)\";
+          end=$$(date +%s);
+          elapsed=$$((end - start));
+          sleep_for=$$((interval - elapsed));
+          if [ $$sleep_for -lt 0 ]; then sleep_for=0; fi;
+          sleep $$sleep_for;
+        done"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.05'
+          memory: 20M
 
 volumes:
-  postgres_data:
   certbot-etc:
