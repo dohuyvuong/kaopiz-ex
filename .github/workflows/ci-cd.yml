@@ -68,6 +68,9 @@ jobs:
 
     env:
       IMAGE_PLATFORM: ${{ vars.IMAGE_PLATFORM || 'linux/amd64' }}
+      DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
       BACKEND_IMAGE: ${{ vars.BACKEND_IMAGE }}
       FRONTEND_IMAGE: ${{ vars.FRONTEND_IMAGE }}
       NGINX_IMAGE: ${{ vars.NGINX_IMAGE }}
