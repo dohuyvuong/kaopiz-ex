@@ -1,5 +1,5 @@
 # Base deps stage: cache full dev dependencies (build + tools)
-FROM node:20-alpine AS deps
+FROM node:24-alpine AS deps
 
 WORKDIR /app
 
@@ -7,7 +7,7 @@ COPY package.json yarn.lock ./
 RUN yarn install --frozen-lockfile
 
 # Build stage: dùng deps đã cache để build, generate Prisma client
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 
 WORKDIR /app
 
@@ -21,7 +21,7 @@ COPY . .
 RUN yarn build
 
 # Prod deps stage: chỉ cài production dependencies để runtime nhẹ hơn
-FROM node:20-alpine AS prod-deps
+FROM node:24-alpine AS prod-deps
 
 WORKDIR /app
 
@@ -29,7 +29,7 @@ COPY package.json yarn.lock ./
 RUN yarn install --frozen-lockfile --production=true
 
 # Production stage: image cuối cùng
-FROM node:20-alpine AS runner
+FROM node:24-alpine AS runner
 
 WORKDIR /app
 ENV NODE_ENV=production

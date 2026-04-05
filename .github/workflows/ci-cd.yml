@@ -42,7 +42,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: yarn
           cache-dependency-path: |
             backend/yarn.lock
@@ -52,13 +52,13 @@ jobs:
         working-directory: backend
         run: |
           yarn install --frozen-lockfile
-          yarn exec eslint "{src,apps,libs,test}/**/*.ts" --max-warnings 0
+          yarn lint
 
       - name: Frontend — install & lint
         working-directory: frontend
         run: |
           yarn install --frozen-lockfile
-          yarn exec eslint . --max-warnings 0
+          yarn lint
 
   deploy:
     name: Build & deploy to VPS

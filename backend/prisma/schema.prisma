@@ -4,8 +4,8 @@
 generator client {
   provider      = "prisma-client-js"
   // native: cho môi trường dev (MacOS, v.v.)
-  // linux-musl-openssl-3.0.x: cho container node:20-alpine (amd64)
-  // linux-musl-arm64-openssl-3.0.x: cho container node:20-alpine (arm64, ví dụ Apple Silicon)
+  // linux-musl-openssl-3.0.x: cho container node:24-alpine (amd64)
+  // linux-musl-arm64-openssl-3.0.x: cho container node:24-alpine (arm64, ví dụ Apple Silicon)
   binaryTargets = ["native", "linux-musl-openssl-3.0.x", "linux-musl-arm64-openssl-3.0.x"]
 }
 

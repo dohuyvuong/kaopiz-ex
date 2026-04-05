@@ -23,23 +23,38 @@ function getPayloadSummary(payload: PendingAction['payload']): string {
   return '—';
 }
 
-export default function AutomationRejectPage() {
-  const params = useParams();
+function InvalidIdError({ router }: { router: ReturnType<typeof useRouter> }) {
+  return (
+    <div className="container max-w-md py-8">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-destructive">Lỗi</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p>ID hành động không hợp lệ.</p>
+          <div className="mt-4 flex gap-2">
+            <Button variant="outline" onClick={() => router.push('/login')}>
+              Đăng nhập
+            </Button>
+            <Button onClick={() => router.push('/dashboard')}>Về Dashboard</Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function RejectFlow({ actionId }: { actionId: number }) {
   const router = useRouter();
-  const actionId = Number(params.id);
   const { rejectAction } = usePendingActions();
   const [action, setAction] = useState<PendingAction | null>(null);
-  const [status, setStatus] = useState<'idle' | 'confirm' | 'loading' | 'success' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'confirm' | 'loading' | 'success' | 'error'>(
+    'idle',
+  );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    if (Number.isNaN(actionId) || actionId <= 0) {
-      setStatus('error');
-      setErrorMessage('ID hành động không hợp lệ.');
-      return;
-    }
     let cancelled = false;
-    setStatus('idle');
     automationApi
       .getActionById(actionId)
       .then((data) => {
@@ -172,4 +187,16 @@ export default function AutomationRejectPage() {
       </Card>
     </div>
   );
+}
+
+export default function AutomationRejectPage() {
+  const params = useParams();
+  const router = useRouter();
+  const actionId = Number(params.id);
+
+  if (Number.isNaN(actionId) || actionId <= 0) {
+    return <InvalidIdError router={router} />;
+  }
+
+  return <RejectFlow key={actionId} actionId={actionId} />;
 }

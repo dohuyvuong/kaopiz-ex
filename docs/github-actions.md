@@ -2,6 +2,8 @@
 
 Workflow: [`.github/workflows/ci-cd.yml`](../.github/workflows/ci-cd.yml).
 
+Job **Lint** dùng **Node.js 24** (khớp `backend/.nvmrc`, `frontend/.nvmrc` và image Docker `node:24-alpine`).
+
 ## Hành vi
 
 | Sự kiện | Công việc |
@@ -37,6 +39,22 @@ Không push image lên registry công khai; image được chuyển trực tiế
 - User deploy có thể chạy `docker compose` trong `DEPLOY_PATH`.
 - Hai file compose dùng đúng lệnh:  
   `docker compose -f docker-compose.db.yml -f docker-compose.yml up -d`.
+
+## Lint khi commit (Husky)
+
+Sau khi **clone repo**, cần chạy `yarn install` trong **`backend/`** hoặc **`frontend/`** ít nhất **một lần**: script `prepare` (`cd .. && husky`) tạo thư mục **`.husky/_`** và ghi vào Git config **`core.hooksPath=.husky/_`**. Nếu bước này không chạy (hoặc ghi `.git/config` thất bại), Git **sẽ không gọi** Husky — commit vẫn thành công nhưng **không lint**.
+
+Kiểm tra nhanh:
+
+```bash
+git config core.hooksPath
+# Kỳ vọng: .husky/_
+```
+
+Nên cài dependency ở **cả hai** package (backend + frontend). Mỗi **commit**, hook **pre-commit** chạy **`yarn lint:fix`** đầy đủ ở **backend** rồi **frontend**, và so **`git status --porcelain` (backend, frontend)** trước/sau; nếu có thay đổi do `--fix`, hook **chặn commit** cho tới khi **`git add`** lại. Cursor / GUI Git thường có **PATH tối thiểu** — hook có **nạp nvm** (`$HOME/.nvm/nvm.sh`) và thêm **Homebrew** (`/opt/homebrew/bin`, `/usr/local/bin`). Nếu vẫn báo không thấy `node` / `yarn`, hãy thử commit trong **Terminal** nơi `nvm` / `fnm` đã kích hoạt, hoặc cài Node qua Homebrew.
+
+- CI vẫn dùng **`yarn lint`** (không `--fix`), xem workflow.
+- Commit có `--no-verify` thì bỏ qua mọi hook.
 
 ## Lưu ý
 

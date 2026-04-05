@@ -1,0 +1,44 @@
+#!/usr/bin/env sh
+
+# GUI Git / Cursor thường chạy sh không đăng nhập → không có node / yarn (đặc biệt khi dùng nvm/fnm).
+[ -n "$NVM_DIR" ] || NVM_DIR="$HOME/.nvm"
+if [ -z "${SKIP_NVM_LOAD-}" ] && [ -s "$NVM_DIR/nvm.sh" ]; then
+  # shellcheck disable=SC1090
+  . "$NVM_DIR/nvm.sh"
+fi
+if ! command -v node >/dev/null 2>&1 && command -v fnm >/dev/null 2>&1; then
+  eval "$(fnm env)"
+fi
+PATH="/opt/homebrew/bin:/usr/local/bin:$PATH${PATH:+:$PATH}"
+
+ROOT="$(git rev-parse --show-toplevel)" || exit 1
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "husky: không tìm thấy node trong PATH (thử mở terminal tương tác hoặc cài Node vào /usr/local hoặc Homebrew)."
+  exit 1
+fi
+if ! command -v yarn >/dev/null 2>&1; then
+  echo "husky: không tìm thấy yarn trong PATH."
+  exit 1
+fi
+
+# Giống spotless/lint-staged: sau khi --fix, working tree có thể khác index — phải add lại rồi commit.
+PORCELAIN_BEFORE="$(git -C "$ROOT" status --porcelain -- backend frontend)"
+
+echo "husky: pre-commit — yarn lint:fix backend…"
+(cd "$ROOT/backend" && yarn lint:fix) || exit $?
+
+echo "husky: pre-commit — yarn lint:fix frontend…"
+(cd "$ROOT/frontend" && yarn lint:fix) || exit $?
+
+PORCELAIN_AFTER="$(git -C "$ROOT" status --porcelain -- backend frontend)"
+
+if [ "$PORCELAIN_BEFORE" != "$PORCELAIN_AFTER" ]; then
+  echo ""
+  echo "husky: eslint --fix đã đổi nội dung trong backend/ hoặc frontend/ (so với trước khi chạy)."
+  echo "husky: hãy xem diff, git add các file liên quan, rồi commit lại."
+  echo "husky: commit hủy."
+  exit 1
+fi
+
+echo "husky: pre-commit — xong."

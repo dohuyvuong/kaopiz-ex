@@ -3,6 +3,7 @@
 ## Yêu cầu
 
 - Docker & Docker Compose
+- Backend và frontend trong container build với **Node.js 24** (`node:24-alpine` trong Dockerfile).
 - (Khuyến nghị) File `.env` ở thư mục gốc: copy từ `.env.example` (`cp .env.example .env`) rồi chỉnh giá trị. File `.env.example` gộp đủ biến cho db, backend và frontend khi chạy Docker.
 
 ## Cấu hình DB: PostgreSQL

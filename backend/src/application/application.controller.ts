@@ -144,11 +144,7 @@ export class ApplicationController {
     @Query('ids') rawIds?: string | string[],
   ) {
     const idStrings =
-      rawIds === undefined
-        ? []
-        : Array.isArray(rawIds)
-          ? rawIds
-          : [rawIds];
+      rawIds === undefined ? [] : Array.isArray(rawIds) ? rawIds : [rawIds];
     const ids = idStrings.map((s) => Number(s));
 
     const data = await this.applicationService.deleteApplicationForms(
