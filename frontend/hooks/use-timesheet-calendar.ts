@@ -58,9 +58,31 @@ interface UseTimesheetCalendarReturn {
   formatMonthYear: (date: Date) => string;
 }
 
-export function useTimesheetCalendar(): UseTimesheetCalendarReturn {
+/**
+ * Đầu vào từ định tuyến (URL hoặc nguồn “bên ngoài” tương đương).
+ * Calendar không phụ thuộc Next — chỉ nhận số / chuỗi đã parse.
+ */
+export interface UseTimesheetCalendarRouteOptions {
+  /** Tháng đang xem (1–12), từ route */
+  routeMonth?: number;
+  routeYear?: number;
+  /**
+   * Ngày mở chi tiết (YYYY-MM-DD). `null` = đóng sheet.
+   * `undefined` = không điều khiển selection từ route (chỉ state nội bộ).
+   */
+  routeSelectedDate?: string | null;
+}
+
+export function useTimesheetCalendar(
+  routeOptions: UseTimesheetCalendarRouteOptions = {},
+): UseTimesheetCalendarReturn {
+  const { routeMonth, routeYear, routeSelectedDate } = routeOptions;
   const appToken = useAuthStore((state) => state.appToken);
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(() =>
+    routeOptions.routeSelectedDate === undefined
+      ? null
+      : routeOptions.routeSelectedDate,
+  );
   const [selectedDay, setSelectedDay] = useState<TimesheetDay | null>(null);
 
   // Merged state
@@ -75,7 +97,18 @@ export function useTimesheetCalendar(): UseTimesheetCalendarReturn {
   // Calendar state
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [viewDate, setViewDate] = useState(new Date());
+  const [viewDate, setViewDate] = useState(() => {
+    if (
+      routeOptions.routeMonth != null &&
+      routeOptions.routeYear != null &&
+      routeOptions.routeMonth >= 1 &&
+      routeOptions.routeMonth <= 12
+    ) {
+      return new Date(routeOptions.routeYear, routeOptions.routeMonth - 1, 1);
+    }
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
   const [calendar, setCalendar] = useState<{
     timelines: TimesheetDay[];
     workingTime: { workStart: string; workEnd: string; timezone: string; timezoneValue: string };
@@ -157,6 +190,32 @@ export function useTimesheetCalendar(): UseTimesheetCalendarReturn {
 
     onReload();
   }, [appToken, monthYear]);
+
+  // Đồng bộ view / selection từ route (browser back, deep link)
+  useEffect(() => {
+    if (routeMonth == null || routeYear == null) return;
+    if (routeMonth < 1 || routeMonth > 12) return;
+    setViewDate((prev) => {
+      const next = new Date(routeYear, routeMonth - 1, 1);
+      if (
+        prev.getFullYear() === next.getFullYear() &&
+        prev.getMonth() === next.getMonth()
+      ) {
+        return prev;
+      }
+      return next;
+    });
+  }, [routeMonth, routeYear]);
+
+  useEffect(() => {
+    if (routeSelectedDate === undefined) return;
+    setSelectedDate((prev) =>
+      prev === routeSelectedDate ? prev : routeSelectedDate,
+    );
+    if (routeSelectedDate == null) {
+      setSelectedDay(null);
+    }
+  }, [routeSelectedDate]);
 
   // Navigation handlers
   const onPreviousMonth = () => {
@@ -426,6 +485,20 @@ export function useTimesheetCalendar(): UseTimesheetCalendarReturn {
     // Chờ tất cả promises hoàn thành
     Promise.all(fetchPromises);
   }, [appToken, summary, viewMonthYear]);
+
+  // Khi mở detail từ URL hoặc calendar vừa load: gắn selectedDay từ timeline
+  useEffect(() => {
+    if (!selectedDate) {
+      setSelectedDay(null);
+      return;
+    }
+    if (!calendar?.timelines?.length) return;
+    const day = calendar.timelines.find((t) => {
+      if (!t.date) return false;
+      return dayjs(t.date).format('YYYY-MM-DD') === selectedDate;
+    });
+    setSelectedDay(day ?? null);
+  }, [selectedDate, calendar]);
 
   // Cập nhật selectedDay khi mergedDays thay đổi (nếu đang có selectedDate)
   useEffect(() => {

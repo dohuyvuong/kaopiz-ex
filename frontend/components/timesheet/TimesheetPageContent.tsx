@@ -5,8 +5,14 @@ import { TimesheetCalendar } from './TimesheetCalendar';
 import { TimesheetDayDetail } from './TimesheetDayDetail';
 import { AutoCreateApplicationsDialog } from './AutoCreateApplicationsDialog';
 import { useTimesheetCalendar } from '@/hooks/use-timesheet-calendar';
+import {
+  useReadTimesheetRouteState,
+  useWriteTimesheetRouteQuery,
+} from '@/hooks/use-timesheet-route-params';
 
 export function TimesheetPageContent() {
+  const routeState = useReadTimesheetRouteState();
+
   const [showAutoCreateDialog, setShowAutoCreateDialog] = useState(false);
   const [pendingDetailDate, setPendingDetailDate] = useState<string | null>(null);
   const {
@@ -34,7 +40,13 @@ export function TimesheetPageContent() {
     onMonthYearChange,
     onReload,
     formatMonthYear,
-  } = useTimesheetCalendar();
+  } = useTimesheetCalendar({
+    routeMonth: routeState.month,
+    routeYear: routeState.year,
+    routeSelectedDate: routeState.date,
+  });
+
+  useWriteTimesheetRouteQuery(month, year, selectedDate);
 
   // Tự động mở lại day detail sau khi calendar load xong và mergedDays đã được cập nhật
   useEffect(() => {
