@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { ApplicationApiService } from '../api/services/hrm/application-api.service';
 import { CreateApplicationFormDto } from './dto/create-application-form.dto';
@@ -189,5 +189,20 @@ export class ApplicationService {
     });
 
     return transformedData;
+  }
+
+  /**
+   * Xoá đơn từ (proxy sang HRM)
+   */
+  async deleteApplicationForms(token: string, ids: number[]) {
+    if (!ids?.length) {
+      throw new BadRequestException('Cần ít nhất một id đơn từ');
+    }
+    const invalid = ids.some((id) => !Number.isInteger(id) || id <= 0);
+    if (invalid) {
+      throw new BadRequestException('Danh sách id không hợp lệ');
+    }
+
+    return this.applicationApiService.deleteApplicationForms(token, ids);
   }
 }

@@ -4,12 +4,32 @@ import { TimesheetDay } from '@/lib/types/timesheet';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Clock, AlertCircle, CheckCircle2, Briefcase, FileText, Plus } from 'lucide-react';
+import {
+  Clock,
+  AlertCircle,
+  CheckCircle2,
+  Briefcase,
+  FileText,
+  Plus,
+  Trash2,
+  Loader2,
+} from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { useTimesheetDayDetail } from '@/hooks/use-timesheet-day-detail';
 import { CreateApplicationFormDialog } from './CreateApplicationFormDialog';
-import { useState, useMemo } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { useState, useMemo, useCallback, useEffect } from 'react';
+import { AxiosError } from 'axios';
+import { toast } from 'sonner';
+import { applicationApi } from '@/lib/api/application';
 
 interface TimesheetDayDetailData {
   calendarDay?: TimesheetDay | null;
@@ -50,6 +70,14 @@ export function TimesheetDayDetail({
     formatDateTime,
   } = useTimesheetDayDetail(date);
   const [showCreateFormDialog, setShowCreateFormDialog] = useState(false);
+  const [deletingFormId, setDeletingFormId] = useState<number | null>(null);
+  const [deleteConfirmFormId, setDeleteConfirmFormId] = useState<number | null>(
+    null,
+  );
+
+  useEffect(() => {
+    setDeleteConfirmFormId(null);
+  }, [date]);
 
   // Kiểm tra xem có đơn chưa approve (status !== 3) và là typeId 1 hoặc 2 cho ngày đó không
   // Logic này giống với hasPendingForms trong calendar
@@ -62,16 +90,46 @@ export function TimesheetDayDetail({
     return hasPending || false;
   }, [day]);
 
-  if (!date) return null;
-
   const handleCreateFormSuccess = async () => {
-    // Đóng detail trước
+    if (!date) return;
     onClose();
-    // Notify parent để reload calendar và tự động mở lại detail sau khi load xong
     onApplicationFormCreated?.(date);
   };
 
+  const confirmDeleteApplicationForm = useCallback(async () => {
+    if (!date || deleteConfirmFormId === null) return;
+    const formId = deleteConfirmFormId;
+    setDeletingFormId(formId);
+    try {
+      await applicationApi.deleteApplicationForms([formId]);
+      toast.success('Đã xoá đơn từ');
+      setDeleteConfirmFormId(null);
+      onClose();
+      onApplicationFormCreated?.(date);
+    } catch (err) {
+      const payload = err instanceof AxiosError ? err.response?.data : null;
+      const msg =
+        payload &&
+        typeof payload === 'object' &&
+        'message' in payload &&
+        typeof (payload as { message: unknown }).message === 'string'
+          ? (payload as { message: string }).message
+          : err instanceof Error
+            ? err.message
+            : 'Không xoá được đơn từ';
+      toast.error(msg);
+    } finally {
+      setDeletingFormId(null);
+    }
+  }, [date, deleteConfirmFormId, onApplicationFormCreated, onClose]);
+
+  if (!date) return null;
+
+  const isDeleteBusy =
+    deleteConfirmFormId !== null && deletingFormId === deleteConfirmFormId;
+
   return (
+    <>
     <Sheet open={!!date} onOpenChange={(open) => !open && onClose()}>
       <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
         <SheetHeader>
@@ -254,16 +312,33 @@ export function TimesheetDayDetail({
                       key={form.id || index}
                       className="p-3 border rounded-md space-y-2"
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
-                          <span className="font-semibold">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+                          <span className="font-semibold truncate">
                             {form.type.name}
                           </span>
                         </div>
-                        <Badge variant="outline">
-                          {form.status === 3 ? 'Đã duyệt' : form.status === 1 ? 'Chờ duyệt' : form.status === 2 ? 'Chờ duyệt (bước 2)' : `Status ${form.status}`}
-                        </Badge>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Badge variant="outline">
+                            {form.status === 3 ? 'Đã duyệt' : form.status === 1 ? 'Chờ duyệt' : form.status === 2 ? 'Chờ duyệt (bước 2)' : `Status ${form.status}`}
+                          </Badge>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            disabled={deletingFormId === form.id}
+                            onClick={() => setDeleteConfirmFormId(form.id)}
+                            aria-label="Xoá đơn"
+                          >
+                            {deletingFormId === form.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
                       </div>
                       {form.data.trackingTimes && form.data.trackingTimes.length > 0 && (
                         <div className="text-sm text-muted-foreground space-y-1">
@@ -308,14 +383,31 @@ export function TimesheetDayDetail({
                         key={form.id || index}
                         className="p-3 border rounded-md space-y-2"
                       >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <CheckCircle2 className="h-4 w-4 text-green-600" />
-                            <span className="font-semibold">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+                            <span className="font-semibold truncate">
                               {form.typeId === 1 ? 'Nghỉ phép' : form.typeId === 2 ? 'Vắng mặt' : form.typeId === 3 ? 'Check-in/out' : `Loại ${form.typeId}`}
                             </span>
                           </div>
-                          <Badge variant="outline">Đã duyệt</Badge>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Badge variant="outline">Đã duyệt</Badge>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              disabled={deletingFormId === form.id}
+                              onClick={() => setDeleteConfirmFormId(form.id)}
+                              aria-label="Xoá đơn"
+                            >
+                              {deletingFormId === form.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
                         </div>
                         {form.data?.trackingTimes && form.data.trackingTimes.length > 0 && (
                           <div className="text-sm text-muted-foreground space-y-1">
@@ -377,5 +469,53 @@ export function TimesheetDayDetail({
         />
       </SheetContent>
     </Sheet>
+
+    <Dialog
+      open={deleteConfirmFormId !== null}
+      onOpenChange={(open) => {
+        if (!open && !isDeleteBusy) setDeleteConfirmFormId(null);
+      }}
+    >
+      <DialogContent
+        showCloseButton={!isDeleteBusy}
+        className="sm:max-w-md"
+        onPointerDownOutside={(e) => {
+          if (isDeleteBusy) e.preventDefault();
+        }}
+        onEscapeKeyDown={(e) => {
+          if (isDeleteBusy) e.preventDefault();
+        }}
+      >
+        <DialogHeader>
+          <DialogTitle>Xoá đơn từ?</DialogTitle>
+          <DialogDescription>
+            Hành động này không thể hoàn tác trên giao diện này. Hệ thống HRM có thể
+            từ chối nếu đơn không đủ điều kiện xoá.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setDeleteConfirmFormId(null)}
+            disabled={isDeleteBusy}
+          >
+            Huỷ
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={() => void confirmDeleteApplicationForm()}
+            disabled={isDeleteBusy}
+          >
+            {isDeleteBusy ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : null}
+            Xoá đơn
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

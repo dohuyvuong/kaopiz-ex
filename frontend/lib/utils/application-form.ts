@@ -109,29 +109,28 @@ export function countAbsenceFormsInWeek(
   dayDetailMap?: Map<string, { applicationForms?: DayDetailApplicationForm[] }>,
   mergedDays?: Map<string, TimesheetDay & { hasPendingForms?: boolean }>,
 ): number {
-  if (!calendarDays || !date) return 0;
+  if (!date) return 0;
 
   const selectedDate = dayjs(date);
   const weekStart = selectedDate.startOf('week'); // Chủ nhật
   const weekEnd = selectedDate.endOf('week'); // Thứ bảy
 
   let count = 0;
-  const processedDates = new Set<string>(); // Tránh đếm trùng
 
-  calendarDays.forEach(({ date: dayDate, timesheet }) => {
-    if (!timesheet) return;
-    const day = dayjs(dayDate);
-    // Kiểm tra trong cùng tuần (bao gồm cả weekStart và weekEnd)
-    if (day.isBefore(weekStart, 'day') || day.isAfter(weekEnd, 'day')) return;
+  const timesheetByDate = new Map<string, TimesheetDay | null>();
+  (calendarDays || []).forEach(({ date: dayDate, timesheet }) => {
+    timesheetByDate.set(dayjs(dayDate).format('YYYY-MM-DD'), timesheet);
+  });
 
-    const dateStr = day.format('YYYY-MM-DD');
-    if (processedDates.has(dateStr)) return;
-    processedDates.add(dateStr);
+  // Duyệt đủ 7 ngày trong tuần để không bị thiếu khi tuần vắt qua 2 tháng
+  let cursor = weekStart.startOf('day');
+  while (!cursor.isAfter(weekEnd, 'day')) {
+    const dateStr = cursor.format('YYYY-MM-DD');
+    const timesheet = timesheetByDate.get(dateStr) || null;
 
     // Kiểm tra approved forms
-    // Đơn vắng mặt (typeId 2) với reasonId 21 (Thay đổi thời gian làm việc)
     const hasApprovedAbsenceForm =
-      timesheet.approvedApplicationForms?.some(
+      timesheet?.approvedApplicationForms?.some(
         (form) =>
           form.typeId === 2 &&
           form.data?.trackingTimes?.some((tt) => tt.reasonId === 21),
@@ -139,37 +138,39 @@ export function countAbsenceFormsInWeek(
 
     if (hasApprovedAbsenceForm) {
       count++;
-      return;
+      cursor = cursor.add(1, 'day');
+      continue;
     }
 
-    // Kiểm tra pending forms từ mergedDays (ưu tiên vì có data cho tất cả các ngày trong tuần)
+    // Kiểm tra pending forms từ mergedDays (ưu tiên vì có thể chứa data toàn tuần)
     if (mergedDays) {
       const mergedDay = mergedDays.get(dateStr);
       if (mergedDay?.approvedApplicationForms) {
         const approvedFormIds = new Set(
-          (timesheet.approvedApplicationForms || []).map((f) => f.id),
+          (timesheet?.approvedApplicationForms || []).map((f) => f.id),
         );
         const hasPendingAbsenceForm = mergedDay.approvedApplicationForms.some(
           (form) =>
             form.typeId === 2 &&
             form.data?.trackingTimes?.some((tt) => tt.reasonId === 21) &&
-            !approvedFormIds.has(form.id), // Chỉ lấy pending forms
+            !approvedFormIds.has(form.id),
         );
         if (hasPendingAbsenceForm) {
           count++;
-          return;
+          cursor = cursor.add(1, 'day');
+          continue;
         }
       }
     }
 
-    // Kiểm tra pending forms từ dayDetailMap (fallback, chỉ có data cho ngày hiện tại)
+    // Kiểm tra pending forms từ dayDetailMap (fallback)
     if (dayDetailMap) {
       const dayDetail = dayDetailMap.get(dateStr);
       const hasPendingAbsenceForm =
         dayDetail?.applicationForms?.some(
           (form) =>
             form.typeId === 2 &&
-            form.status !== 3 && // Chưa approve
+            form.status !== 3 &&
             form.data?.trackingTimes?.some((tt) => tt.reasonId === 21),
         ) || false;
 
@@ -177,7 +178,9 @@ export function countAbsenceFormsInWeek(
         count++;
       }
     }
-  });
+
+    cursor = cursor.add(1, 'day');
+  }
 
   return count;
 }

@@ -5,6 +5,7 @@ import {
   ApplicationFormReasonsResponse,
   ApprovalAssignmentsResponse,
   ApproverPreferencesResponse,
+  DeleteApplicationFormsResponse,
 } from '@/lib/types/application';
 import type { ApproverPreferences } from '@/lib/types/approver-preferences';
 import apiClient from './client';
@@ -86,6 +87,19 @@ export const applicationApi = {
       '/application/forms',
       payload
     );
+    return response.data.data;
+  },
+
+  /**
+   * Xoá một hoặc nhiều đơn từ (ids lặp lại trên query cho Nest)
+   */
+  async deleteApplicationForms(
+    ids: number[],
+  ): Promise<DeleteApplicationFormsResponse> {
+    const qs = ids.map((id) => `ids=${encodeURIComponent(id)}`).join('&');
+    const response = await apiClient.delete<{
+      data: DeleteApplicationFormsResponse;
+    }>(`/application/forms?${qs}`);
     return response.data.data;
   },
 };

@@ -23,6 +23,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useAutoCreateApplications } from '@/hooks/use-auto-create-applications';
 import { ApplicationToCreate } from '@/lib/utils/auto-create-applications';
 import { TimesheetDay } from '@/lib/types/timesheet';
@@ -63,6 +64,8 @@ export function AutoCreateApplicationsDialog({
     progress,
     previewAfterApprove,
     missingApprovers,
+    createSummary,
+    resetCreateFeedback,
   } = useAutoCreateApplications({
     calendarDays,
     workingTime,
@@ -95,11 +98,22 @@ export function AutoCreateApplicationsDialog({
     }
   }, [open]);
 
+  const handleDialogOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      resetCreateFeedback();
+      setEditingIndex(null);
+      setEditForm(null);
+    }
+    onOpenChange(nextOpen);
+  };
+
   const handleCreate = async () => {
-    await createApplications();
-    if (!error) {
+    const totalToCreate = applications.length;
+    const success = await createApplications();
+    if (success) {
+      toast.success(`Đã tạo thành công ${totalToCreate} đơn`);
       onSuccess?.();
-      onOpenChange(false);
+      handleDialogOpenChange(false);
     }
   };
 
@@ -152,7 +166,7 @@ export function AutoCreateApplicationsDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>Tự động tạo đơn</DialogTitle>
@@ -169,23 +183,36 @@ export function AutoCreateApplicationsDialog({
               Đang tính toán các đơn cần tạo...
             </span>
           </div>
-        ) : error ? (
-          <div className="flex items-start gap-2 p-4 bg-destructive/10 border border-destructive/20 rounded-md">
-            <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-destructive">{error}</p>
-            </div>
-          </div>
-        ) : applications.length === 0 ? (
-          <div className="flex items-center justify-center py-8">
-            <CheckCircle2 className="h-6 w-6 text-green-600" />
-            <span className="ml-2 text-sm text-muted-foreground">
-              Không cần tạo đơn. Tổng đi muộn/về sớm đã ≤ 90 phút.
-            </span>
-          </div>
         ) : (
-          <>
-            <div className="space-y-4">
+          <div className="space-y-4">
+            {error && (
+              <div className="flex items-start gap-2 p-4 bg-destructive/10 border border-destructive/20 rounded-md">
+                <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-destructive">{error}</p>
+                </div>
+              </div>
+            )}
+            {createSummary && createSummary.created > 0 && createSummary.failed > 0 && (
+              <div className="flex items-start gap-2 p-4 bg-emerald-50 border border-emerald-200 rounded-md dark:bg-emerald-950/20 dark:border-emerald-800">
+                <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
+                    Đã tạo thành công {createSummary.created} đơn
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {applications.length === 0 ? (
+              <div className="flex items-center justify-center py-8">
+                <CheckCircle2 className="h-6 w-6 text-green-600" />
+                <span className="ml-2 text-sm text-muted-foreground">
+                  Không cần tạo đơn. Tổng đi muộn/về sớm đã ≤ 90 phút.
+                </span>
+              </div>
+            ) : (
+              <>
               {/* Cảnh báo thiếu người duyệt */}
               {missingApprovers.length > 0 && (
                 <div className="flex items-start gap-2 p-4 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
@@ -413,14 +440,15 @@ export function AutoCreateApplicationsDialog({
                   ))}
                 </div>
               </div>
-            </div>
-          </>
+              </>
+            )}
+          </div>
         )}
 
         <DialogFooter>
           <Button
             variant="outline"
-            onClick={() => onOpenChange(false)}
+            onClick={() => handleDialogOpenChange(false)}
             disabled={loading}
           >
             Hủy

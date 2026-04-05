@@ -285,7 +285,7 @@ export function useTimesheetCalendar(): UseTimesheetCalendarReturn {
     if (!isCurrentOrPreviousMonth) return;
 
     // Tìm các ngày cần fetch detail
-    const daysToFetch: Array<{ date: string; timesheet: TimesheetDay }> = [];
+    const daysToFetch: Array<{ date: string; timesheet: TimesheetDay | null }> = [];
 
     summary.timelines.forEach((timesheet) => {
       if (!timesheet.date) return;
@@ -304,6 +304,24 @@ export function useTimesheetCalendar(): UseTimesheetCalendarReturn {
       }
     });
 
+    // Bổ sung các ngày nằm ngoài tháng nhưng hiển thị trong lưới calendar (tuần vắt tháng).
+    // Mục tiêu: lấy applicationForms để đếm đúng rule theo tuần khi auto-create.
+    calendarDays.forEach(({ date: dayDate }) => {
+      const d = dayjs(dayDate);
+      const isOutsideViewMonth =
+        d.month() + 1 !== month || d.year() !== year;
+      if (!isOutsideViewMonth) return;
+
+      const dateStr = d.format('YYYY-MM-DD');
+      // Tránh push trùng với danh sách đã có
+      const exists = daysToFetch.some(
+        ({ date }) => dayjs(date).format('YYYY-MM-DD') === dateStr,
+      );
+      if (!exists) {
+        daysToFetch.push({ date: dateStr, timesheet: null });
+      }
+    });
+
     // Fetch tất cả day details
     const fetchPromises = daysToFetch.map(({ date, timesheet }) => {
       const dateStr = dayjs(date).format('YYYY-MM-DD');
@@ -319,30 +337,68 @@ export function useTimesheetCalendar(): UseTimesheetCalendarReturn {
       return timesheetApi
         .getDayDetail(dateStr)
         .then((response: TimesheetDayDetailResponse) => {
-          // Kiểm tra xem có đơn chưa approve không (status !== 3)
-          const pendingForms = response.applicationForms.filter(
-            (form) => form.status !== 3 && (form.typeId === 1 || form.typeId === 2), // Nghỉ phép hoặc vắng mặt
+          const allTrackedForms = response.applicationForms.filter(
+            (form) => form.typeId === 1 || form.typeId === 2,
           );
 
-          if (pendingForms.length > 0) {
+          // Kiểm tra xem có đơn chưa approve không (status !== 3)
+          const pendingForms = allTrackedForms.filter(
+            (form) => form.status !== 3, // Nghỉ phép hoặc vắng mặt
+          );
+
+          const formsToStore = timesheet ? pendingForms : allTrackedForms;
+
+          if (formsToStore.length > 0) {
             // Merge đơn chưa approve vào timeline
-            const mergedDay: TimesheetDay & { hasPendingForms?: boolean } = {
-              ...timesheet,
-              approvedApplicationForms: [
-                ...(timesheet.approvedApplicationForms || []),
-                ...pendingForms.map((form) => ({
-                  id: form.id,
-                  userId: 0, // Không có trong day detail
-                  typeId: form.typeId,
-                  startDate: form.startDate,
-                  endDate: form.endDate,
-                  data: form.data,
-                  createdAt: null,
-                  user: undefined,
-                })),
-              ],
-              hasPendingForms: true,
-            };
+            const mergedDay: TimesheetDay & { hasPendingForms?: boolean } = timesheet
+              ? {
+                  ...timesheet,
+                  approvedApplicationForms: [
+                    ...(timesheet.approvedApplicationForms || []),
+                    ...formsToStore.map((form) => ({
+                      id: form.id,
+                      userId: 0, // Không có trong day detail
+                      typeId: form.typeId,
+                      startDate: form.startDate,
+                      endDate: form.endDate,
+                      data: form.data,
+                      createdAt: null,
+                      user: undefined,
+                    })),
+                  ],
+                  hasPendingForms: true,
+                }
+              : {
+                  // Synthetic day cho ngày ngoài tháng (chỉ cần để đếm form theo tuần)
+                  date,
+                  timeIn: null,
+                  timeOut: null,
+                  symbol: null,
+                  location: '',
+                  timeInFinal: null,
+                  timeOutFinal: null,
+                  work: 'N',
+                  workDays: 0,
+                  workHours: 0,
+                  workStart: null,
+                  workEnd: null,
+                  minutesLate: 0,
+                  minutesEarly: 0,
+                  approvedApplicationForms: formsToStore.map((form) => ({
+                    id: form.id,
+                    userId: 0,
+                    typeId: form.typeId,
+                    startDate: form.startDate,
+                    endDate: form.endDate,
+                    data: form.data,
+                    createdAt: null,
+                    user: undefined,
+                  })),
+                  logWork: null,
+                  logWorkDiff: 0,
+                  logWorkNeeded: 0,
+                  hasPendingForms: pendingForms.length > 0,
+                };
 
             setMergedDays((prev) => {
               const newMap = new Map(prev);

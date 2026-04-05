@@ -120,3 +120,9 @@ export interface CreateApplicationFormPayload {
   applicationApprovals?: CreateApplicationApproval[];
   description?: string;
 }
+
+/** Phản hồi ack khi xoá đơn (proxy từ HRM, thường { message: "OK" }) */
+export interface DeleteApplicationFormsResponse {
+  message?: string;
+  [key: string]: unknown;
+}

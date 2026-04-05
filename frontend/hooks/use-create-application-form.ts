@@ -445,17 +445,6 @@ export function useCreateApplicationForm({
   const validate = useCallback((): boolean => {
     setValidationError(null);
 
-    // Kiểm tra thời hạn: chỉ cho phép tạo đơn trong vòng 7 ngày trở lại (từ hôm nay)
-    const selectedDate = dayjs(date);
-    const today = dayjs();
-    const minDate = today.subtract(7, 'day'); // 7 ngày trước từ hôm nay
-
-    // Chỉ cho phép tạo đơn từ hôm nay trở về 7 ngày
-    // Warning message đã được xử lý bởi getWarningMessage
-    if (selectedDate.isBefore(minDate, 'day')) {
-      return false;
-    }
-
     // Kiểm tra tất cả người duyệt đều được chọn
     if (selectedType) {
       const approverCount = getApproverCount(selectedType);
@@ -513,13 +502,6 @@ export function useCreateApplicationForm({
       const calculatedMinutes = calculateMinutes(timeStart, timeEnd);
       if (calculatedMinutes === null) {
         setValidationError('Thời gian không hợp lệ');
-        return false;
-      }
-
-      if (calculatedMinutes > 60) {
-        setValidationError(
-          'Đơn Vắng mặt - Thay đổi thời gian làm việc không được quá 60 phút',
-        );
         return false;
       }
 

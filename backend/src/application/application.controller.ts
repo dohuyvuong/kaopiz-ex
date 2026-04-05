@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Put, Body, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Query,
+} from '@nestjs/common';
 import { ApplicationService } from './application.service';
 import { ApproverPreferenceService } from './approver-preference.service';
 import { CreateApplicationFormDto } from './dto/create-application-form.dto';
@@ -119,6 +127,33 @@ export class ApplicationController {
     const data = await this.applicationService.createApplicationForm(
       token,
       body,
+    );
+    return {
+      success: true,
+      data,
+    };
+  }
+
+  /**
+   * DELETE /application/forms?ids=1&ids=2
+   * Xoá đơn từ (một hoặc nhiều id); HRM quyết định có cho phép xoá hay không.
+   */
+  @Delete('forms')
+  async deleteApplicationForms(
+    @Token() token: string,
+    @Query('ids') rawIds?: string | string[],
+  ) {
+    const idStrings =
+      rawIds === undefined
+        ? []
+        : Array.isArray(rawIds)
+          ? rawIds
+          : [rawIds];
+    const ids = idStrings.map((s) => Number(s));
+
+    const data = await this.applicationService.deleteApplicationForms(
+      token,
+      ids,
     );
     return {
       success: true,

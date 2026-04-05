@@ -33,7 +33,7 @@ interface UseAutoCreateApplicationsReturn {
   loading: boolean;
   error: string | null;
   calculateApplications: () => void;
-  createApplications: () => Promise<void>;
+  createApplications: () => Promise<boolean>;
   totalMinutesReduced: number;
   updateApplication: (index: number, app: ApplicationToCreate) => void;
   removeApplication: (index: number) => void;
@@ -52,6 +52,11 @@ interface UseAutoCreateApplicationsReturn {
     typeName: string;
     missingOrders: number[];
   }>;
+  createSummary: {
+    created: number;
+    failed: number;
+  } | null;
+  resetCreateFeedback: () => void;
 }
 
 export function useAutoCreateApplications({
@@ -75,6 +80,10 @@ export function useAutoCreateApplications({
     total: 0,
     currentApp: null,
   });
+  const [createSummary, setCreateSummary] = useState<{
+    created: number;
+    failed: number;
+  } | null>(null);
 
   const totalMinutesReduced = useMemo(() => {
     return applications.reduce((sum, app) => sum + app.minutes, 0);
@@ -234,10 +243,12 @@ export function useAutoCreateApplications({
       );
       setApplications(apps);
       setError(null);
+      setCreateSummary(null);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Lỗi khi tính toán các đơn cần tạo',
       );
+      setCreateSummary(null);
     }
   }, [calendarDays, workingTime, mergedDays]);
 
@@ -256,24 +267,28 @@ export function useAutoCreateApplications({
     setApplications((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
-  const createApplications = useCallback(async () => {
+  const createApplications = useCallback(async (): Promise<boolean> => {
     if (!appToken) {
       setError('Chưa đăng nhập với HRM. Vui lòng đăng nhập.');
-      return;
+      setCreateSummary(null);
+      return false;
     }
 
     if (!userId) {
       setError('Chưa có thông tin người dùng');
-      return;
+      setCreateSummary(null);
+      return false;
     }
 
     if (applications.length === 0) {
       setError('Không có đơn nào để tạo');
-      return;
+      setCreateSummary(null);
+      return false;
     }
 
     setLoading(true);
     setError(null);
+    setCreateSummary(null);
     setProgress({
       current: 0,
       total: applications.length,
@@ -308,110 +323,149 @@ export function useAutoCreateApplications({
         }
       }
 
-      // 3. Tạo từng đơn với progress tracking
+      // 3. Tạo từng đơn với progress tracking (không dừng toàn bộ nếu 1 đơn lỗi)
+      const failedApps: Array<{ app: ApplicationToCreate; reason: string }> = [];
+      let successCount = 0;
+
       for (let i = 0; i < applications.length; i++) {
         const app = applications[i];
-        setProgress({
-          current: i + 1,
-          total: applications.length,
-          currentApp: app,
-        });
+        try {
+          setProgress({
+            current: i + 1,
+            total: applications.length,
+            currentApp: app,
+          });
 
-        const type = types.find((t) => t.id === app.typeId);
-        if (!type) {
-          throw new Error(`Không tìm thấy loại đơn với typeId: ${app.typeId}`);
-        }
+          const type = types.find((t) => t.id === app.typeId);
+          if (!type) {
+            throw new Error(`Không tìm thấy loại đơn với typeId: ${app.typeId}`);
+          }
 
-        const savedTypeApprovers = ApproverPreferencesHelper.getByTypeId(
-          preferences,
-          app.typeId,
-        );
-        const applicationApprovals: Array<{ userId: number; order: number }> =
-          [];
+          const savedTypeApprovers = ApproverPreferencesHelper.getByTypeId(
+            preferences,
+            app.typeId,
+          );
+          const applicationApprovals: Array<{ userId: number; order: number }> =
+            [];
 
-        // Kiểm tra xem có đủ approvers đã lưu không
-        for (let order = 1; order <= type.orderMax; order++) {
-          const savedApproverId = savedTypeApprovers[order];
-          if (savedApproverId) {
-            // Kiểm tra approver này có trong danh sách không
-            const availableApprovers = approversMap[app.typeId]?.[order] || [];
-            const isValid = availableApprovers.some(
-              (a) => a.userId === savedApproverId,
-            );
-            if (isValid) {
-              applicationApprovals.push({
-                userId: savedApproverId,
-                order,
-              });
+          // Kiểm tra xem có đủ approvers đã lưu không
+          for (let order = 1; order <= type.orderMax; order++) {
+            const savedApproverId = savedTypeApprovers[order];
+            if (savedApproverId) {
+              // Kiểm tra approver này có trong danh sách không
+              const availableApprovers = approversMap[app.typeId]?.[order] || [];
+              const isValid = availableApprovers.some(
+                (a) => a.userId === savedApproverId,
+              );
+              if (isValid) {
+                applicationApprovals.push({
+                  userId: savedApproverId,
+                  order,
+                });
+              }
             }
           }
+
+          // Nếu không có đủ approvers, bỏ qua đơn này và báo lỗi
+          if (applicationApprovals.length < type.orderMax) {
+            throw new Error(
+              `Thiếu người duyệt cho đơn ngày ${app.date}. Vui lòng chọn người duyệt trước.`,
+            );
+          }
+
+          const payload: CreateApplicationFormPayload = {
+            typeId: app.typeId,
+            startDate: app.date,
+            endDate: app.date,
+            data: {
+              reasonId: app.reasonId,
+              trackingTimes:
+                app.typeId === 2
+                  ? [
+                      {
+                        date: app.date,
+                        timeStart: app.timeStart,
+                        timeEnd: app.timeEnd,
+                        reasonId: app.reasonId,
+                      },
+                    ]
+                  : [
+                      {
+                        dateStart: app.date,
+                        dateEnd: app.date,
+                        timeStart: app.timeStart,
+                        timeEnd: app.timeEnd,
+                        reasonId: app.reasonId,
+                      },
+                    ],
+            },
+            applicationApprovals:
+              applicationApprovals.length > 0
+                ? applicationApprovals
+                : undefined,
+            description: app.description,
+          };
+
+          await applicationApi.createApplicationForm(payload);
+          successCount += 1;
+        } catch (err) {
+          failedApps.push({
+            app,
+            reason:
+              err instanceof Error
+                ? err.message
+                : 'Không thể tạo đơn. Vui lòng thử lại.',
+          });
         }
-
-        // Nếu không có đủ approvers, bỏ qua đơn này và báo lỗi
-        if (applicationApprovals.length < type.orderMax) {
-          throw new Error(
-            `Thiếu người duyệt cho đơn ngày ${app.date}. Vui lòng chọn người duyệt trước.`,
-          );
-        }
-
-        const payload: CreateApplicationFormPayload = {
-          typeId: app.typeId,
-          startDate: app.date,
-          endDate: app.date,
-          data: {
-            reasonId: app.reasonId,
-            trackingTimes:
-              app.typeId === 2
-                ? [
-                    {
-                      date: app.date,
-                      timeStart: app.timeStart,
-                      timeEnd: app.timeEnd,
-                      reasonId: app.reasonId,
-                    },
-                  ]
-                : [
-                    {
-                      dateStart: app.date,
-                      dateEnd: app.date,
-                      timeStart: app.timeStart,
-                      timeEnd: app.timeEnd,
-                      reasonId: app.reasonId,
-                    },
-                  ],
-          },
-          applicationApprovals:
-            applicationApprovals.length > 0
-              ? applicationApprovals
-              : undefined,
-          description: app.description,
-        };
-
-        await applicationApi.createApplicationForm(payload);
       }
 
-      // 4. Reset applications sau khi tạo thành công
-      setApplications([]);
+      // 4. Cập nhật UI theo kết quả tạo từng đơn
+      if (failedApps.length === 0) {
+        setApplications([]);
+        setError(null);
+        setCreateSummary(null);
+      } else {
+        setApplications(failedApps.map((item) => item.app));
+        setError(`Không tạo được ${failedApps.length} đơn`);
+        setCreateSummary({
+          created: successCount,
+          failed: failedApps.length,
+        });
+      }
+
       setProgress({
         current: 0,
         total: 0,
         currentApp: null,
       });
+      return failedApps.length === 0;
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
           : 'Lỗi khi tạo các đơn. Vui lòng thử lại.',
       );
+      setCreateSummary(null);
       setProgress({
         current: 0,
         total: 0,
         currentApp: null,
       });
+      return false;
     } finally {
       setLoading(false);
     }
   }, [appToken, userId, applications, preferences]);
+
+  const resetCreateFeedback = useCallback(() => {
+    setError(null);
+    setCreateSummary(null);
+    setProgress({
+      current: 0,
+      total: 0,
+      currentApp: null,
+    });
+  }, []);
 
   return {
     applications,
@@ -425,5 +479,7 @@ export function useAutoCreateApplications({
     progress,
     previewAfterApprove,
     missingApprovers,
+    createSummary,
+    resetCreateFeedback,
   };
 }

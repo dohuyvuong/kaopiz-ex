@@ -99,4 +99,22 @@ export class ApplicationApiService {
 
     return rawData;
   }
+
+  /**
+   * Xoá đơn từ (một hoặc nhiều id) — HRM: DELETE /api/application-form?ids[]=...
+   */
+  async deleteApplicationForms(
+    token: string,
+    ids: number[],
+  ): Promise<unknown> {
+    this.logger.log(`Calling HRM API: deleteApplicationForms (${ids.length} id(s))`);
+
+    const qs = ids.map((id) => `ids[]=${encodeURIComponent(id)}`).join('&');
+    const rawData = await this.hrmService.delete(
+      `/application-form?${qs}`,
+      token,
+    );
+
+    return rawData;
+  }
 }

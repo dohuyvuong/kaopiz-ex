@@ -39,48 +39,40 @@ function countAbsenceFormsInWeek(
   const weekEnd = selectedDate.endOf('week');
 
   let count = 0;
-  const processedDates = new Set<string>();
 
+  const timesheetByDate = new Map<string, TimesheetDay | null>();
   calendarDays.forEach(({ date: dayDate, timesheet }) => {
-    if (!timesheet) return;
-    const day = dayjs(dayDate);
-    if (day.isBefore(weekStart) || day.isAfter(weekEnd)) return;
-
-    const dateStr = dayjs(dayDate).format('YYYY-MM-DD');
-    if (processedDates.has(dateStr)) return;
-    processedDates.add(dateStr);
-
-    // Kiểm tra từ timesheet (approved forms)
-    const hasApprovedAbsence = timesheet.approvedApplicationForms?.some(
-      (form) =>
-        form.typeId === 2 &&
-        form.data?.trackingTimes?.some((tt) => tt.reasonId === 21),
-    ) || false;
-
-    if (hasApprovedAbsence) {
-      count++;
-      return;
-    }
-
-    // Kiểm tra từ mergedDays (pending forms)
-    if (mergedDays) {
-      const mergedDay = mergedDays.get(dateStr);
-      if (mergedDay?.approvedApplicationForms) {
-        const approvedFormIds = new Set(
-          (timesheet.approvedApplicationForms || []).map((f) => f.id),
-        );
-        const hasPendingAbsence = mergedDay.approvedApplicationForms.some(
-          (form) =>
-            form.typeId === 2 &&
-            form.data?.trackingTimes?.some((tt) => tt.reasonId === 21) &&
-            !approvedFormIds.has(form.id), // Chỉ lấy pending forms
-        );
-        if (hasPendingAbsence) {
-          count++;
-        }
-      }
-    }
+    timesheetByDate.set(dayjs(dayDate).format('YYYY-MM-DD'), timesheet);
   });
+
+  // Duyệt đủ 7 ngày trong tuần để không bỏ sót tuần vắt qua 2 tháng
+  let cursor = weekStart.startOf('day');
+  while (!cursor.isAfter(weekEnd, 'day')) {
+    const dateStr = cursor.format('YYYY-MM-DD');
+    const timesheet = timesheetByDate.get(dateStr) || null;
+    const mergedDay = mergedDays?.get(dateStr);
+
+    const hasApprovedAbsence =
+      timesheet?.approvedApplicationForms?.some(
+        (form) =>
+          form.typeId === 2 &&
+          form.data?.trackingTimes?.some((tt) => tt.reasonId === 21),
+      ) || false;
+
+    // mergedDay có thể chứa cả approved + pending, chỉ cần có form vắng mặt là tính 1 ngày
+    const hasMergedAbsence =
+      mergedDay?.approvedApplicationForms?.some(
+        (form) =>
+          form.typeId === 2 &&
+          form.data?.trackingTimes?.some((tt) => tt.reasonId === 21),
+      ) || false;
+
+    if (hasApprovedAbsence || hasMergedAbsence) {
+      count++;
+    }
+
+    cursor = cursor.add(1, 'day');
+  }
 
   return count;
 }
