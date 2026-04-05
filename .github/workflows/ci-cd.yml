@@ -1,0 +1,141 @@
+# CI: ESLint (backend + frontend) trên PR/push → master
+# CD: push master → build 3 image (trùng tag với .env trên VPS), scp tarball, docker load, docker compose up -d
+#
+# Cần cấu hình trên GitHub → Settings → Secrets and variables → Actions
+#
+# Secrets:
+#   SSH_PRIVATE_KEY     — private key SSH (full PEM, multiline)
+#   SSH_KNOWN_HOSTS     — (khuyến nghị) output của `ssh-keyscan -H your.vps.host`
+#
+# Variables (Repository variables):
+#   DEPLOY_HOST         — hostname hoặc IP VPS
+#   DEPLOY_USER         — user SSH
+#   DEPLOY_PATH         — thư mục trên VPS chứa docker-compose.yml + .env (vd: /opt/checklistreview)
+#   BACKEND_IMAGE       — phải trùng BACKEND_IMAGE trong .env server (vd: checklistreview-backend:latest)
+#   FRONTEND_IMAGE      — trùng FRONTEND_IMAGE trên server
+#   NGINX_IMAGE         — trùng NGINX_IMAGE trên server
+#   NEXT_PUBLIC_API_BASE_URL — URL API public mà browser gọi (bake vào Next khi build)
+#
+# Optional variable:
+#   IMAGE_PLATFORM      — mặc định linux/amd64 (đổi nếu VPS khác kiến trúc)
+
+name: CI/CD
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Không hủy job deploy đang chạy khi có push mới (tránh VPS dở dang)
+  cancel-in-progress: false
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: yarn
+          cache-dependency-path: |
+            backend/yarn.lock
+            frontend/yarn.lock
+
+      - name: Backend — install & lint
+        working-directory: backend
+        run: |
+          yarn install --frozen-lockfile
+          yarn exec eslint "{src,apps,libs,test}/**/*.ts" --max-warnings 0
+
+      - name: Frontend — install & lint
+        working-directory: frontend
+        run: |
+          yarn install --frozen-lockfile
+          yarn exec eslint . --max-warnings 0
+
+  deploy:
+    name: Build & deploy to VPS
+    runs-on: ubuntu-latest
+    needs: lint
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+
+    env:
+      IMAGE_PLATFORM: ${{ vars.IMAGE_PLATFORM || 'linux/amd64' }}
+      BACKEND_IMAGE: ${{ vars.BACKEND_IMAGE }}
+      FRONTEND_IMAGE: ${{ vars.FRONTEND_IMAGE }}
+      NGINX_IMAGE: ${{ vars.NGINX_IMAGE }}
+      NEXT_PUBLIC_API_BASE_URL: ${{ vars.NEXT_PUBLIC_API_BASE_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check required variables
+        run: |
+          for v in DEPLOY_HOST DEPLOY_USER DEPLOY_PATH BACKEND_IMAGE FRONTEND_IMAGE NGINX_IMAGE NEXT_PUBLIC_API_BASE_URL; do
+            eval "val=\$$v"
+            if [ -z "$val" ]; then
+              echo "::error::Repository variable $v is not set (Settings → Secrets and variables → Actions → Variables)"
+              exit 1
+            fi
+          done
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build images
+        run: |
+          docker build --platform "$IMAGE_PLATFORM" -t "$BACKEND_IMAGE" ./backend
+          docker build --platform "$IMAGE_PLATFORM" \
+            --build-arg NEXT_PUBLIC_API_BASE_URL="$NEXT_PUBLIC_API_BASE_URL" \
+            -t "$FRONTEND_IMAGE" ./frontend
+          docker build --platform "$IMAGE_PLATFORM" -t "$NGINX_IMAGE" ./nginx
+
+      - name: Save images for transfer
+        run: |
+          docker save "$BACKEND_IMAGE" "$FRONTEND_IMAGE" "$NGINX_IMAGE" | gzip > /tmp/stack-images.tar.gz
+          ls -lh /tmp/stack-images.tar.gz
+
+      - name: Prepare SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+        run: |
+          if [ -z "${SSH_PRIVATE_KEY:-}" ]; then
+            echo "::error::Secret SSH_PRIVATE_KEY is not set"
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          if [ -n "$SSH_KNOWN_HOSTS" ]; then
+            echo "$SSH_KNOWN_HOSTS" >> ~/.ssh/known_hosts
+          else
+            echo "::warning::SSH_KNOWN_HOSTS secret empty; using ssh-keyscan (nên set secret cho bảo mật tốt hơn)"
+            ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+          fi
+
+      - name: Copy images to server
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+        run: |
+          scp -i ~/.ssh/deploy_key -o BatchMode=yes /tmp/stack-images.tar.gz "${DEPLOY_USER}@${DEPLOY_HOST}:/tmp/stack-images.tar.gz"
+
+      - name: Load images and restart stack
+        run: |
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes \
+            "${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}" bash -s << 'EOF'
+          set -euo pipefail
+          gunzip -c /tmp/stack-images.tar.gz | docker load
+          rm -f /tmp/stack-images.tar.gz
+          cd ${{ vars.DEPLOY_PATH }}
+          docker compose -f docker-compose.db.yml -f docker-compose.yml up -d
+          EOF
