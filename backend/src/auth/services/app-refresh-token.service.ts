@@ -72,7 +72,7 @@ export class AppRefreshTokenService {
         where: { token },
       });
       this.logger.log('Refresh token revoked');
-    } catch (error) {
+    } catch {
       // Token might not exist, that's okay
       this.logger.warn('Failed to revoke refresh token (might not exist)');
     }

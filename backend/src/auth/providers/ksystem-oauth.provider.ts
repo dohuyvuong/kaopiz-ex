@@ -51,7 +51,6 @@ export class KsystemOAuthProvider implements AuthProvider {
    * @param code - Authorization code từ Ksystem OAuth
    * @param state - State parameter (optional, dùng cho CSRF protection - chưa implement validation)
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async exchangeCode(code: string, state?: string): Promise<TokenResponse> {
     try {
       // Gọi HRM API callback endpoint để exchange code thành token
