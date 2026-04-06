@@ -65,6 +65,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: lint
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    # Cache layer BuildKit (type=gha): cần ghi Actions cache khi cache-to.
+    permissions:
+      contents: read
+      actions: write
 
     env:
       IMAGE_PLATFORM: ${{ vars.IMAGE_PLATFORM || 'linux/amd64' }}
@@ -92,13 +96,43 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build images
-        run: |
-          docker build --platform "$IMAGE_PLATFORM" -t "$BACKEND_IMAGE" ./backend
-          docker build --platform "$IMAGE_PLATFORM" \
-            --build-arg NEXT_PUBLIC_API_BASE_URL="$NEXT_PUBLIC_API_BASE_URL" \
-            -t "$FRONTEND_IMAGE" ./frontend
-          docker build --platform "$IMAGE_PLATFORM" -t "$NGINX_IMAGE" ./nginx
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          platforms: ${{ env.IMAGE_PLATFORM }}
+          tags: ${{ env.BACKEND_IMAGE }}
+          load: true
+          provenance: false
+          cache-from: type=gha,scope=deploy-backend
+          cache-to: type=gha,mode=max,scope=deploy-backend
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          platforms: ${{ env.IMAGE_PLATFORM }}
+          build-args: |
+            NEXT_PUBLIC_API_BASE_URL=${{ env.NEXT_PUBLIC_API_BASE_URL }}
+          tags: ${{ env.FRONTEND_IMAGE }}
+          load: true
+          provenance: false
+          cache-from: type=gha,scope=deploy-frontend
+          cache-to: type=gha,mode=max,scope=deploy-frontend
+
+      - name: Build nginx image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./nginx
+          file: ./nginx/Dockerfile
+          platforms: ${{ env.IMAGE_PLATFORM }}
+          tags: ${{ env.NGINX_IMAGE }}
+          load: true
+          provenance: false
+          cache-from: type=gha,scope=deploy-nginx
+          cache-to: type=gha,mode=max,scope=deploy-nginx
 
       - name: Save images for transfer
         run: |

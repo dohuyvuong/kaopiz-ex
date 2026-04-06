@@ -13,6 +13,8 @@ Job **Lint** dùng **Node.js 24** (khớp `backend/.nvmrc`, `frontend/.nvmrc` v�
 
 Không push image lên registry công khai; image được chuyển trực tiếp tới server.
 
+**Cache Docker (job deploy):** build qua `docker/build-push-action` với `cache-from` / `cache-to: type=gha` và **scope** riêng (`deploy-backend`, `deploy-frontend`, `deploy-nginx`) để BuildKit tái dùng layer **giữa các lần chạy CI**. Dockerfile backend/frontend đã **multi-stage** (tách deps / build / runner); multi-stage giúp layer ổn định trong một build, còn **gha** mới giữ cache **trên runner khác**. Job deploy có `permissions.actions: write` để ghi Actions cache.
+
 ## GitHub — Secrets
 
 | Secret | Mô tả |
