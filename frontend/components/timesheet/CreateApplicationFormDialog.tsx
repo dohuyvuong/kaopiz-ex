@@ -95,15 +95,16 @@ export function CreateApplicationFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[500px] max-h-[calc(100vh-2rem)] overflow-hidden p-0 gap-0">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b">
           <DialogTitle>Tạo đơn từ</DialogTitle>
           <DialogDescription>
             Tạo đơn từ cho ngày {dayjs(data.date).format('DD/MM/YYYY')}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="min-h-0 overflow-y-auto px-6 py-4">
+          <div className="space-y-4">
           {loadingTypes ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -339,9 +340,12 @@ export function CreateApplicationFormDialog({
               {error}
             </div>
           )}
+          </div>
+        </div>
 
-          {/* Actions */}
-          <div className="flex justify-end gap-2 pt-4">
+        {/* Actions cố định ở footer */}
+        <div className="shrink-0 border-t px-6 py-4">
+          <div className="flex justify-end gap-2">
             <Button
               variant="outline"
               onClick={() => onOpenChange(false)}
