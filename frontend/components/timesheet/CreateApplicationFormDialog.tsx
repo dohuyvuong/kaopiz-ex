@@ -95,7 +95,7 @@ export function CreateApplicationFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] max-h-[calc(100vh-2rem)] overflow-hidden p-0 gap-0">
+      <DialogContent className="sm:max-w-[500px] max-h-[calc(100vh-2rem)] overflow-hidden p-0 gap-0 flex flex-col">
         <DialogHeader className="px-6 pt-6 pb-4 border-b">
           <DialogTitle>Tạo đơn từ</DialogTitle>
           <DialogDescription>
@@ -103,7 +103,7 @@ export function CreateApplicationFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="min-h-0 overflow-y-auto px-6 py-4">
+        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
           <div className="space-y-4">
           {loadingTypes ? (
             <div className="flex items-center justify-center py-8">

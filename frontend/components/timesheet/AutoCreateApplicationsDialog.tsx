@@ -170,7 +170,7 @@ export function AutoCreateApplicationsDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleDialogOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[calc(100vh-2rem)] overflow-hidden p-0 gap-0">
+      <DialogContent className="sm:max-w-[600px] max-h-[calc(100vh-2rem)] overflow-hidden p-0 gap-0 flex flex-col">
         <DialogHeader className="px-6 pt-6 pb-4 border-b">
           <DialogTitle>Tự động tạo đơn</DialogTitle>
           <DialogDescription>
@@ -179,7 +179,7 @@ export function AutoCreateApplicationsDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="min-h-0 overflow-y-auto px-6 py-4">
+        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
           {loading && applications.length === 0 ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
