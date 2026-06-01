@@ -165,6 +165,9 @@ export function AutoCreateApplicationsDialog({
     }
   };
 
+  const totalViolationMinutes =
+    (summary?.summary.minutesLate || 0) + (summary?.summary.minutesEarly || 0);
+
   return (
     <Dialog open={open} onOpenChange={handleDialogOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
@@ -208,7 +211,9 @@ export function AutoCreateApplicationsDialog({
               <div className="flex items-center justify-center py-8">
                 <CheckCircle2 className="h-6 w-6 text-green-600" />
                 <span className="ml-2 text-sm text-muted-foreground">
-                  Không cần tạo đơn. Tổng đi muộn/về sớm đã ≤ 90 phút.
+                  {totalViolationMinutes > 90
+                    ? 'Không có đơn cần tạo thêm trong phạm vi 7 ngày gần nhất.'
+                    : 'Không cần tạo đơn. Tổng đi muộn/về sớm đã ≤ 90 phút.'}
                 </span>
               </div>
             ) : (
