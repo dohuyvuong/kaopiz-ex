@@ -81,15 +81,17 @@ export class NotificationService {
     autoApproveMinutes: number,
     approveUrl: string,
     rejectUrl: string,
+    detail?: string,
   ): Promise<void> {
     const actionTypeLabel =
       actionType === 'auto-review-checklist'
         ? 'checklist cần duyệt'
         : 'đơn cần tạo';
+    const detailMessage = detail ? `\n\n${detail}` : '';
 
     await this.send(channel, target, {
       title: '🔔 Có hành động chờ xác nhận',
-      message: `Bạn có <b>${actionCount} ${actionTypeLabel}</b>.\n\nVui lòng xác nhận trong <b>${autoApproveMinutes} phút</b>, nếu không hệ thống sẽ tự động thực hiện.`,
+      message: `Bạn có <b>${actionCount} ${actionTypeLabel}</b>.\n\nVui lòng xác nhận trong <b>${autoApproveMinutes} phút</b>, nếu không hệ thống sẽ tự động thực hiện.${detailMessage}`,
       actionUrl: approveUrl,
       inlineButtons: [
         { text: '✅ Duyệt', url: approveUrl },

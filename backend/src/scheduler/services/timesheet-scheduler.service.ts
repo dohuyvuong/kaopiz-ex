@@ -13,6 +13,11 @@ import {
 import { TimesheetDayDto } from '../../timesheet/dto/timesheet-calendar.dto';
 import dayjs from 'dayjs';
 
+interface AutoCreateDayCandidate {
+  date: string;
+  data: TimesheetDayDto;
+}
+
 @Injectable()
 export class TimesheetSchedulerService {
   private readonly logger = new Logger(TimesheetSchedulerService.name);
@@ -108,7 +113,7 @@ export class TimesheetSchedulerService {
     }
 
     // Get timesheet data for all months
-    const allDaysNeedingForms = [];
+    const allDaysNeedingForms: AutoCreateDayCandidate[] = [];
     for (const monthYear of monthsToCheck) {
       try {
         const calendar = await this.timesheetService.getCalendar(
@@ -181,6 +186,7 @@ export class TimesheetSchedulerService {
       setting.autoApproveAfterMinutes,
       approveUrl,
       rejectUrl,
+      this.buildAutoCreateFormsDetail(allDaysNeedingForms),
     );
 
     this.logger.log(`Sent notification to user ${userId}`);
@@ -211,5 +217,37 @@ export class TimesheetSchedulerService {
       (dayData.workHours < 8 && dayData.workHours > 0); // Less than 8 hours but worked
 
     return hasIssues;
+  }
+
+  /**
+   * Build notification details for auto-create forms.
+   * Show a compact list of days and basic issue summary.
+   */
+  private buildAutoCreateFormsDetail(days: AutoCreateDayCandidate[]): string {
+    const maxLines = 8;
+    const detailLines = days.slice(0, maxLines).map(({ date, data }) => {
+      const basicIssues: string[] = [];
+
+      if (data.minutesLate > 0) {
+        basicIssues.push(`đi muộn ${data.minutesLate}p`);
+      }
+      if (data.minutesEarly > 0) {
+        basicIssues.push(`về sớm ${data.minutesEarly}p`);
+      }
+      if (data.workHours > 0 && data.workHours < 8) {
+        basicIssues.push(`làm ${data.workHours}h`);
+      }
+
+      const issueSummary =
+        basicIssues.length > 0 ? basicIssues.join(', ') : 'cần tạo đơn';
+      return `• ${dayjs(date).format('DD/MM/YYYY')}: ${issueSummary}`;
+    });
+
+    const remainingCount = days.length - maxLines;
+    if (remainingCount > 0) {
+      detailLines.push(`• ...và ${remainingCount} ngày khác`);
+    }
+
+    return `<b>Danh sách đơn cần tạo:</b>\n${detailLines.join('\n')}`;
   }
 }
