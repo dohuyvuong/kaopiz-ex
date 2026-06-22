@@ -174,5 +174,5 @@ jobs:
           gunzip -c /tmp/stack-images.tar.gz | docker load
           rm -f /tmp/stack-images.tar.gz
           cd ${{ vars.DEPLOY_PATH }}
-          docker compose -f docker-compose.db.yml -f docker-compose.yml up -d
+          docker compose --profile db --profile app --profile edge up -d
           EOF

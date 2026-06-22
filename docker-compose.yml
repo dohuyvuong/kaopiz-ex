@@ -1,13 +1,43 @@
+# Profiles:
+#   db   — Postgres trong Docker (tuỳ chọn; có thể dùng DATABASE_URL trỏ DB ngoài)
+#   app  — backend + frontend (luôn đi cùng nhau)
+#   edge — nginx + keep-alive (production / public domain)
+#
+# Ví dụ:
+#   docker compose --profile db up -d
+#   docker compose --profile db --profile app up -d
+#   docker compose --profile db --profile app --profile edge up -d
+
 services:
+  db:
+    profiles: ["db"]
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5432:5432"
+
   backend:
+    profiles: ["app"]
     image: ${BACKEND_IMAGE}
     hostname: ${BACKEND_HOST}
     restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
+        required: false
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}}
       PORT: ${BACKEND_PORT}
       CORS_ORIGIN: ${CORS_ORIGIN}
       JWT_SECRET: ${JWT_SECRET}
@@ -26,6 +56,7 @@ services:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
 
   frontend:
+    profiles: ["app"]
     image: ${FRONTEND_IMAGE}
     hostname: ${FRONTEND_HOST}
     restart: unless-stopped
@@ -36,6 +67,7 @@ services:
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
 
   nginx:
+    profiles: ["edge"]
     image: ${NGINX_IMAGE}
     restart: unless-stopped
     depends_on:
@@ -57,6 +89,7 @@ services:
       - "443:443"
 
   keep-alive:
+    profiles: ["edge"]
     image: alpine:3.23
     environment:
       PRIMARY_DOMAIN: ${PRIMARY_DOMAIN}
@@ -86,4 +119,5 @@ services:
           memory: 20M
 
 volumes:
+  postgres_data:
   certbot-etc:

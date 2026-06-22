@@ -9,7 +9,7 @@ Job **Lint** dùng **Node.js 24** (khớp `backend/.nvmrc`, `frontend/.nvmrc` v�
 | Sự kiện | Công việc |
 |---------|-----------|
 | PR hoặc push vào **`master`** | Lint: ESLint backend + frontend (không `--fix`) |
-| **Push** vào **`master`** (sau khi lint pass) | Build 3 image Docker → đóng gói `docker save` → SCP lên VPS → `docker load` → `docker compose -f docker-compose.db.yml -f docker-compose.yml up -d` |
+| **Push** vào **`master`** (sau khi lint pass) | Build 3 image Docker → đóng gói `docker save` → SCP lên VPS → `docker load` → `docker compose --profile db --profile app --profile edge up -d` |
 
 Không push image lên registry công khai; image được chuyển trực tiếp tới server.
 
@@ -28,7 +28,7 @@ Không push image lên registry công khai; image được chuyển trực tiế
 |----------|--------|
 | `DEPLOY_HOST` | Hostname hoặc IP VPS |
 | `DEPLOY_USER` | User SSH |
-| `DEPLOY_PATH` | Đường dẫn tuyệt đối trên VPS tới thư mục có `docker-compose.yml`, `docker-compose.db.yml` và `.env` |
+| `DEPLOY_PATH` | Đường dẫn tuyệt đối trên VPS tới thư mục có `docker-compose.yml` và `.env` |
 | `BACKEND_IMAGE` | **Trùng** `BACKEND_IMAGE` trong `.env` trên VPS |
 | `FRONTEND_IMAGE` | **Trùng** `FRONTEND_IMAGE` trên VPS |
 | `NGINX_IMAGE` | **Trùng** `NGINX_IMAGE` trên VPS |
@@ -39,8 +39,8 @@ Không push image lên registry công khai; image được chuyển trực tiế
 
 - Đã có `.env` runtime (DB, JWT, OAuth, tên image, …) như môi trường production.
 - User deploy có thể chạy `docker compose` trong `DEPLOY_PATH`.
-- Hai file compose dùng đúng lệnh:  
-  `docker compose -f docker-compose.db.yml -f docker-compose.yml up -d`.
+- Deploy stack production dùng lệnh:  
+  `docker compose --profile db --profile app --profile edge up -d`.
 
 ## Lint khi commit (Husky)
 
