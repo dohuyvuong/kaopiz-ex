@@ -1,175 +1,108 @@
-# Auto-create Applications
+# Tự động tạo đơn
 
-## Tổng quan
+## Bài toán
 
-Module này tự động tính toán và tạo các đơn từ để giảm tổng đi muộn/về sớm xuống ≤ 90 phút. Logic ưu tiên:
-1. **Đơn vắng mặt (Thay đổi thời gian làm việc):** Chỉ tạo khi ngày đó làm đủ ít nhất 8 tiếng theo **thời gian hiệu quả** = (timeOut − timeIn) − **nghỉ trưa 1 giờ** − phút về sớm. Ví dụ 28/1: 8h02 − 1h − 47p = 7h15 &lt; 8h → không ưu tiên. Mỗi đơn tối đa 60 phút. Một tuần tối đa 2 đơn loại này — không tốn phép năm.
-2. Tạo đơn nghỉ phép cho phần còn lại (nếu tổng > 90 phút)
+HRM phạt theo **tổng đi muộn + về sớm của cả tháng**, có hạn mức miễn phạt (`workingTime.minutesEarlyLateAllowed`, hiện là 90 phút). Vượt hạn mức thì bị phạt tiền.
 
-## Component Structure
+Mục tiêu: tạo vừa đủ đơn để kéo tổng về dưới hạn mức, với **chi phí thấp nhất cho người dùng**.
 
-### Main Component
+## Thứ tự ưu tiên theo chi phí
 
-**File**: `frontend/components/timesheet/AutoCreateApplicationsDialog.tsx`
+**1. Đơn vắng mặt — lý do 21 "Thay đổi thời gian làm việc"**
 
-Dialog component với preview và progress tracking.
+Không tốn phép năm. Nhưng bị HRM giới hạn, và giới hạn đọc từ `/master/all-reasons`:
 
-### Custom Hook: useAutoCreateApplications
+- `maxTimesInWeek: 2` — tối đa 2 lần mỗi tuần (thứ Hai → Chủ nhật)
+- `maxMinutesInDay: 60` — tối đa 60 phút mỗi lần
+- Ngày đó phải đủ giờ làm
 
-**File**: `frontend/hooks/use-auto-create-applications.ts`
+**2. Đơn xin nghỉ — lý do 4 "Nghỉ phép năm"**
 
-Hook quản lý logic tính toán và tạo đơn.
+Không giới hạn số lần nhưng **tốn phép năm**. Chỉ dùng cho phần đơn vắng mặt không gánh nổi.
 
-## Calculation Logic
+Thuật toán **dừng ngay khi đủ che phần vượt hạn mức** — mỗi đơn đều tốn công người duyệt, không tạo thừa.
 
-### calculateApplicationsToCreate Function
+## Điều kiện đủ giờ làm
 
-**File**: `frontend/lib/utils/auto-create-applications.ts`
+Lý do 21 có tên đầy đủ là *"Thay đổi thời gian làm việc (Vẫn đảm bảo đủ 8 tiếng)"*. `hasEnoughWorkHours` chấp nhận theo hai cách, chỉ cần thoả một:
 
-**Function**: `calculateApplicationsToCreate`
+- Giờ làm hiệu quả `(timeOut − timeIn − nghỉ trưa)` đạt đủ định mức, **hoặc**
+- Về muộn bù đủ số phút đã đi muộn: `timeOut − workEnd ≥ minutesLate`
 
-**Code reference**: `frontend/lib/utils/auto-create-applications.ts:161-429`
+Ví dụ 31/07/2026: muộn 35 phút — nặng nhất tháng — nhưng ra về lúc `15:55`. Giờ hiệu quả là 5h50, và về sớm nên không bù được. **Không đủ điều kiện** cho lý do 21, phải dùng phép năm.
 
-### Steps
+## Không đề xuất chồng lên đơn sẵn có
 
-#### 1. Tính tổng minutesLate + minutesEarly
+Khoảng giờ đề xuất được tính bằng cách **trừ đi phần đã bị đơn khác chiếm** trong cửa sổ vi phạm.
 
-- Lặp qua `calendarDays` và tính tổng vi phạm
-- Trừ đi số phút đã được giảm từ các đơn pending (từ `mergedDays`)
+Nhờ vậy hai đơn trong cùng một ngày nối tiếp nhau thay vì chồng lên nhau — ví dụ xin đi muộn `08:30–09:30` rồi xin nghỉ tiếp `09:30–10:00`. Đây là tình huống HRM cho phép và người dùng thực tế có dùng.
 
-**Code reference**: `frontend/lib/utils/auto-create-applications.ts:172-222`
+## Mỗi đề xuất tự nói nó che gì
 
-#### 2. Lọc violations trong vòng 1 tuần
+`SuggestedForm` có trường `covers: 'late' | 'early'`.
 
-- Chỉ lấy các ngày trong vòng 7 ngày từ hôm nay
+> Bản cũ suy ngược điều này bằng cách dò chữ trong câu mô tả tiếng Việt (`description.includes('đi muộn')`), và dò **sai** vì đơn vắng mặt sinh ra mô tả viết hoa `"Đi muộn 40 phút"`. Hệ quả: preview "sau khi duyệt" hiển thị sai số.
 
-**Code reference**: `frontend/lib/utils/auto-create-applications.ts:224-228`
+## Ví dụ đầy đủ — tháng 07/2026
 
-#### 3. Sắp xếp violations
+Dữ liệu thật từ `fixtures/`. Tổng muộn 115 phút, hạn mức 90 → cần che **25 phút**.
 
-- Ưu tiên ngày có vi phạm lớn nhất
-- Sau đó ưu tiên ngày gần nhất
+Các ngày muộn, sắp theo mức độ: 31/07 (35p), 13/07 (17p), 16/07 (13p), 01/07 (12p), 14/07 (12p), 08/07 (10p)…
 
-**Code reference**: `frontend/lib/utils/auto-create-applications.ts:230-244`
+| Ngày | Kết quả | Vì sao |
+|---|---|---|
+| 31/07 (35p) | ❌ đơn vắng mặt | ra về 15:55, không đủ 8 tiếng |
+| 13/07 (17p) | ❌ | tuần 13–19/07 đã có 2 đơn lý do 21 đã duyệt (15/07, 17/07) — **hết quota** |
+| 16/07 (13p) | ❌ | cùng tuần trên, hết quota |
+| 14/07 (12p) | ❌ | cùng tuần trên, hết quota |
+| **01/07 (12p)** | ✅ đơn vắng mặt `08:30–08:42` | tuần 29/06–05/07 mới dùng 1/2 |
+| **31/07** | ✅ nghỉ phép `08:30–08:43` (13p) | phần dư, đặt vào ngày nặng nhất |
 
-#### 4. Tận dụng đơn vắng mặt (Thay đổi thời gian làm việc)
+Tổng che 25 phút → tháng vừa đúng 90, hết bị phạt.
 
-- **Điều kiện:** Thời gian hiệu quả ≥ 8 tiếng. Thời gian hiệu quả = (timeOut − timeIn) − **nghỉ trưa 1h** − phút về sớm. Ngày 28/1: 8h02 − 1h − 47p = 7h15 &lt; 8h → không ưu tiên; chọn 26/1 và 30/1
-- Tối đa 2 đơn vắng mặt mỗi tuần, cho các ngày có vi phạm lớn nhất
-- Mỗi đơn tối đa 60 phút (thay đổi giờ càng nhiều càng tốt)
-- Ưu tiên đi muộn trước, sau đó về sớm
+Ví dụ này cho thấy vì sao "chọn ngày vi phạm nặng nhất" không đủ: quota tuần và điều kiện giờ làm mới là thứ quyết định.
 
-**Code reference**: `frontend/lib/utils/auto-create-applications.ts:269-385`
+## Hai nơi dùng, một logic
 
-#### 5. Tạo đơn nghỉ phép cho phần còn lại
+| Nơi | Kích hoạt | Đường đi |
+|---|---|---|
+| Nút "Tự động tạo đơn" | người dùng bấm | `useAutoCreateApplications` → `suggestForms` |
+| Cron | 10:00 hằng ngày | `TimesheetSchedulerService` → `TimesheetSnapshotService` → `suggestForms` |
 
-- Chỉ tạo nếu tổng > 90 phút sau khi đã trừ đơn vắng mặt
-- Tạo cho phần vượt quá 90 phút
+Cùng một hàm trong `@kaopiz/timesheet`, nên hai nơi không thể đề xuất khác nhau.
 
-**Code reference**: `frontend/lib/utils/auto-create-applications.ts:326-426`
+### Luồng cron
 
-## Preview After Approve
-
-### Calculation
-
-**Function**: `previewAfterApprove` (useMemo)
-
-**Code reference**: `frontend/hooks/use-auto-create-applications.ts:82-155`
-
-### Logic
-
-1. Lấy summary hiện tại
-2. Trừ đi số phút từ các đơn pending (từ `mergedDays`)
-3. Trừ đi số phút từ các đơn sẽ tạo (từ `applications`)
-4. Phân bổ theo tỷ lệ late/early
-
-**Result**: `{ minutesLate, minutesEarly, total }`
-
-## Missing Approvers Detection
-
-### Logic
-
-**Function**: `missingApprovers` (useMemo)
-
-**Code reference**: `frontend/hooks/use-auto-create-applications.ts:173-209`
-
-### Steps
-
-1. Fetch types từ API
-2. Lấy unique typeIds từ applications
-3. Kiểm tra saved approvers trong Redux state
-4. Tìm các order thiếu cho mỗi typeId
-
-**Result**: Array of `{ typeId, typeName, missingOrders }`
-
-## Submit Flow
-
-### createApplications Function
-
-**Function**: `createApplications`
-
-**Code reference**: `frontend/hooks/use-auto-create-applications.ts:248-418`
-
-### Steps
-
-1. **Validate**: Kiểm tra token, userId, applications
-2. **Fetch Types**: Lấy danh sách types
-3. **Fetch Approvers**: Lấy approvers cho từng typeId và order
-4. **Create Applications**: Tạo từng đơn một với progress tracking
-5. **Update Progress**: Cập nhật progress sau mỗi đơn
-
-### Progress Tracking
-
-```typescript
-progress: {
-  current: number,
-  total: number,
-  currentApp: ApplicationToCreate | null
-}
+```
+cron 10:00
+  → user bật job auto-create-forms, token HRM còn hạn
+  → TimesheetSnapshotService.build(token, monthYear)   quét TRỌN THÁNG
+  → suggestForms
+  → PendingAction (payload = SuggestedForm[])
+  → thông báo Telegram kèm nút Duyệt / Từ chối
+  → người dùng duyệt, hoặc tự duyệt sau N phút
+  → executeFormCreation: tra người duyệt, gọi HRM tạo từng đơn
 ```
 
-**Code reference**: `frontend/hooks/use-auto-create-applications.ts:67-75, 266-270, 300-310`
+Vài điểm đáng lưu ý:
 
-## Application Management
+- **Quét trọn tháng, không phải N ngày gần đây.** Vi phạm tính theo tháng nên "7 ngày gần đây" không trả lời được câu "tháng này có vượt hạn mức không". Trước ngày 10 thì quét cả tháng trước, vì tháng trước vẫn còn trong hạn nộp đơn.
+- **Chống gửi trùng.** Cron chạy hằng ngày; đã có pending action chờ xử lý thì bỏ qua.
+- **Người duyệt tra lúc thực thi**, không lưu trong payload — từ lúc gửi thông báo tới lúc bấm duyệt có thể vài giờ, đủ để người dùng đổi lựa chọn.
+- Một đơn lỗi không chặn các đơn còn lại; hỏng toàn bộ thì ném lỗi thay vì im lặng.
 
-### Update Application
+## Giới hạn đã biết
 
-**Function**: `updateApplication`
+- Ước tính **thận trọng hơn thực tế**. HRM đôi khi rộng lượng hơn: một đơn chạm vào đầu ca có thể miễn toàn bộ phần muộn của ca đó (ngày 20/04/2026, đơn 1 phút `08:30–08:31` xoá sạch 12 phút muộn). Tool cố ý không khai thác điều này — che khít theo số phút vi phạm thật, kết quả cuối để HRM chốt.
+- **Lý do 20** *"OT hôm trước sau 21:00 (Cho phép đi muộn 30 phút)"* cũng không tốn phép và cho 5 lần/tuần, nhưng chưa được tận dụng. Người dùng vẫn tự tạo tay được.
 
-Cho phép chỉnh sửa đơn trước khi submit.
+## Files
 
-**Code reference**: `frontend/hooks/use-auto-create-applications.ts:233-242`
-
-### Remove Application
-
-**Function**: `removeApplication`
-
-Cho phép xóa đơn khỏi danh sách.
-
-**Code reference**: `frontend/hooks/use-auto-create-applications.ts:244-246`
-
-## UI Features
-
-### Preview Section
-
-- Hiển thị preview sau khi approve
-- Hiển thị missing approvers warning
-- Hiển thị danh sách applications với edit/remove buttons
-
-### Progress Section
-
-- Progress bar khi đang tạo đơn
-- Hiển thị đơn hiện tại đang được tạo
-
-### Success Handling
-
-- Toast notification khi thành công
-- Reload calendar sau khi tạo xong
-
-## API Integration
-
-### POST /application/forms
-
-Tạo từng đơn một với progress tracking.
-
-**Code reference**: `frontend/hooks/use-auto-create-applications.ts:300-310`
+| File | Vai trò |
+|---|---|
+| `shared/src/suggest.ts` | thuật toán đề xuất |
+| `shared/src/suggest.test.ts` | test trên fixture thật |
+| `frontend/hooks/use-auto-create-applications.ts` | gọi API tạo hàng loạt |
+| `frontend/components/timesheet/AutoCreateApplicationsDialog.tsx` | preview, bỏ bớt đơn, tiến độ |
+| `backend/src/scheduler/services/timesheet-scheduler.service.ts` | cron |
+| `backend/src/automation/automation.service.ts` | `executeFormCreation` |

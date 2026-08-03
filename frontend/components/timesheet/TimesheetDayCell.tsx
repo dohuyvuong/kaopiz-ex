@@ -1,174 +1,190 @@
 'use client';
 
-import dayjs from 'dayjs';
-import { TimesheetDay } from '@/lib/types/timesheet';
 import { Badge } from '@/components/ui/badge';
-import { Clock, FileText, Briefcase, Loader2 } from 'lucide-react';
+import { Briefcase, Clock, FileText, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import type { CalendarCell } from '@/hooks/use-timesheet-calendar';
 
 interface TimesheetDayCellProps {
-  date: Date;
-  timesheet: TimesheetDay | null;
-  month: number; // Tháng hiện tại (1-12)
-  onDayClick: (date: string, dayData?: TimesheetDay) => void;
-  isLoading: boolean;
-  hasPendingForms: boolean;
+  cell: CalendarCell;
+  onSelect: (date: string) => void;
 }
 
-export function TimesheetDayCell({
-  date,
-  timesheet,
-  month,
-  onDayClick,
-  isLoading,
-  hasPendingForms,
-}: TimesheetDayCellProps) {
-  const dateStr = dayjs(date).format('YYYY-MM-DD');
+/**
+ * Trạng thái ô, xét theo thứ tự ưu tiên hiển thị.
+ * Tách khỏi JSX để đọc được thành một câu chuyện thay vì chuỗi ternary.
+ */
+type CellStatus =
+  | 'holiday'
+  | 'non-working'
+  | 'violation'
+  | 'violation-covered'
+  | 'missing-punch'
+  | 'has-form'
+  | 'normal'
+  | 'empty';
 
-  // Tự tính isCurrentMonth và isToday từ date
-  const isCurrentMonth = date.getMonth() === month - 1;
-  const isToday = dayjs(date).isSame(dayjs(), 'day');
+function resolveStatus(cell: CalendarCell): CellStatus {
+  const { day, estimate } = cell;
+  if (!day) return 'empty';
+  if (day.work === 'NL') return 'holiday';
+  if (day.work === 'N') return 'non-working';
 
-  const getDayStatus = () => {
-    if (!timesheet) return 'empty';
-    if (timesheet.work === 'NL') return 'holiday';
-    if (timesheet.work === 'N') return 'non-working';
+  const hasViolation =
+    day.actual.minutesLate > 0 || day.actual.minutesEarly > 0;
 
-    if (hasPendingForms) {
-      // Có đơn chưa approve - đánh dấu màu khác
-      if (timesheet.minutesLate > 0 || timesheet.minutesEarly > 0) return 'violation-pending';
-      return 'pending';
-    }
+  if (hasViolation) {
+    // Còn vi phạm sau khi tính cả đơn chờ duyệt thì vẫn là đỏ.
+    const remaining =
+      (estimate?.estimated.minutesLate ?? day.actual.minutesLate) +
+      (estimate?.estimated.minutesEarly ?? day.actual.minutesEarly);
+    return remaining > 0 && !estimate?.hasPendingCoverage
+      ? 'violation'
+      : 'violation-covered';
+  }
 
-    if (timesheet.minutesLate > 0 || timesheet.minutesEarly > 0) return 'violation';
-    if (timesheet.symbol === 'V' || timesheet.symbol === 'P') return 'approved';
-    if (!timesheet.timeIn || !timesheet.timeOut) return 'missing';
-    return 'normal';
-  };
+  if (!day.timeIn || !day.timeOut) return 'missing-punch';
+  if (day.forms.length > 0) return 'has-form';
+  return 'normal';
+}
 
-  const status = getDayStatus();
-  const isHoliday = timesheet?.work === 'NL';
+const STATUS_CLASS: Record<CellStatus, string> = {
+  holiday: 'bg-purple-50 border-purple-300',
+  'non-working': 'bg-muted/50',
+  violation: 'bg-destructive/10 border-destructive/30',
+  'violation-covered': 'bg-orange-50 border-orange-300',
+  'missing-punch': 'bg-yellow-50 border-yellow-200',
+  'has-form': 'bg-green-50 border-green-200',
+  normal: 'bg-green-50 border-green-200',
+  empty: 'bg-muted/30',
+};
+
+/**
+ * Badge số phút vi phạm.
+ *
+ * Hiển thị cả ba con số khi có đơn chờ duyệt che một phần: vi phạm thực tế, số
+ * phút đơn che được, và số còn lại — để người dùng thấy ngay đơn mình tạo có
+ * khớp với số phút bị tính hay không.
+ */
+function ViolationBadge({
+  label,
+  actual,
+  covered,
+  estimated,
+}: {
+  label: string;
+  actual: number;
+  covered: number;
+  estimated: number;
+}) {
+  if (actual <= 0) return null;
+  const isCovered = covered > 0;
+
+  return (
+    <Badge
+      variant={isCovered ? 'secondary' : 'destructive'}
+      className={cn(
+        'text-xs px-1 py-0',
+        isCovered && 'bg-orange-100 text-orange-800 border-orange-300',
+      )}
+      title={
+        isCovered
+          ? `${label} ${actual} phút, đơn chờ duyệt che ${covered} phút, còn ${estimated} phút`
+          : `${label} ${actual} phút`
+      }
+    >
+      {label} {actual}p
+      {isCovered && <span className="ml-1 font-normal">→ {estimated}p</span>}
+    </Badge>
+  );
+}
+
+export function TimesheetDayCell({ cell, onSelect }: TimesheetDayCellProps) {
+  const { day, estimate, isCurrentMonth, isToday, isLoadingDetail } = cell;
+  const status = resolveStatus(cell);
+  const dayOfMonth = Number(cell.date.slice(8, 10));
+
+  // Ngày ngoài tháng vẫn bấm được: panel chi tiết lấy dữ liệu từ day-detail API,
+  // không phụ thuộc vào việc ngày đó có trong lưới tháng này hay không.
+  const canSelect = !isLoadingDetail;
 
   return (
     <button
-      onClick={() => {
-        if (isCurrentMonth && timesheet && !isLoading) {
-          onDayClick(dateStr, timesheet);
-        }
-      }}
-      disabled={!isCurrentMonth || !timesheet || isLoading}
+      type="button"
+      onClick={() => canSelect && onSelect(cell.date)}
+      disabled={!canSelect}
       className={cn(
         'flex flex-col items-start p-2 min-h-[80px] border rounded-md text-left transition-colors',
-        !isCurrentMonth && 'opacity-30 cursor-not-allowed',
-        isCurrentMonth && timesheet && !isLoading && 'cursor-pointer hover:bg-accent',
-        isLoading && 'cursor-wait opacity-60',
+        !isCurrentMonth && 'opacity-40',
+        canSelect && 'cursor-pointer hover:bg-accent',
+        isLoadingDetail && 'cursor-wait opacity-60',
         isToday && 'ring-2 ring-emerald-300',
-        status === 'empty' && 'bg-muted/30',
-        status === 'holiday' && 'bg-purple-50 border-purple-300',
-        status === 'non-working' && 'bg-muted/50',
-        status === 'violation' && 'bg-destructive/10 border-destructive/30',
-        status === 'violation-pending' && 'bg-orange-50 border-orange-300',
-        status === 'pending' && 'bg-blue-50 border-blue-200',
-        status === 'approved' && 'bg-green-50 border-green-200',
-        status === 'missing' && 'bg-yellow-50 border-yellow-200',
-        status === 'normal' && 'bg-green-50 border-green-200',
+        STATUS_CLASS[status],
       )}
     >
-      {/* Row 1: Ngày và badge nghỉ lễ */}
       <div className="flex items-center justify-between w-full mb-1">
-        <div className="text-sm font-medium">{dayjs(date).date()}</div>
-        {isHoliday && (
-          <Badge variant="outline" className="text-xs px-1 py-0 bg-purple-100 text-purple-800 border-purple-300">
+        <div className="text-sm font-medium">{dayOfMonth}</div>
+        {status === 'holiday' && (
+          <Badge
+            variant="outline"
+            className="text-xs px-1 py-0 bg-purple-100 text-purple-800 border-purple-300"
+          >
             Nghỉ lễ
           </Badge>
         )}
       </div>
 
-      {/* Row 2: Nội dung cố định - mỗi dòng luôn chiếm một dòng */}
       <div className="space-y-1 text-xs w-full">
-        {/* Dòng 1: Time In và Time Out - trên màn hình lớn hiển thị cùng một dòng */}
-        <div className="flex flex-col md:flex-row md:items-center md:gap-2 h-4 md:h-4">
-          {/* Trên màn hình lớn: một icon clock cho cả hai */}
-          <div className="hidden md:flex items-center gap-1 h-4">
-            {(timesheet?.timeIn || timesheet?.timeOut) ? (
-              <>
-                <Clock className="h-3 w-3 shrink-0" />
-                {timesheet?.timeIn && <span>{timesheet.timeIn}</span>}
-                {timesheet?.timeIn && timesheet?.timeOut && <span> - </span>}
-                {timesheet?.timeOut && <span>{timesheet.timeOut}</span>}
-              </>
-            ) : (
-              <span className="invisible">-</span>
-            )}
-          </div>
-          {/* Trên màn hình nhỏ: Time In với icon riêng */}
-          <div className="flex md:hidden items-center gap-1 h-4">
-            {timesheet?.timeIn ? (
-              <>
-                <Clock className="h-3 w-3 shrink-0" />
-                <span>{timesheet.timeIn}</span>
-              </>
-            ) : (
-              <span className="invisible">-</span>
-            )}
-          </div>
-          {/* Trên màn hình nhỏ: Time Out với icon riêng */}
-          <div className="flex md:hidden items-center gap-1 h-4">
-            {timesheet?.timeOut ? (
-              <>
-                <Clock className="h-3 w-3 shrink-0" />
-                <span>{timesheet.timeOut}</span>
-              </>
-            ) : (
-              <span className="invisible">-</span>
-            )}
-          </div>
-        </div>
-
-        {/* Dòng 3: Đi muộn/Về sớm */}
-        <div className="flex items-center gap-1 flex-wrap h-4 min-h-[16px]">
-          {timesheet && (timesheet.minutesLate > 0 || timesheet.minutesEarly > 0) ? (
+        {/* Giờ vào / ra */}
+        <div className="flex items-center gap-1 h-4">
+          {day?.timeIn || day?.timeOut ? (
             <>
-              {timesheet.minutesLate > 0 && (
-                <Badge
-                  variant={hasPendingForms ? 'secondary' : 'destructive'}
-                  className={`text-xs px-1 py-0 ${
-                    hasPendingForms ? 'bg-orange-100 text-orange-800 border-orange-300' : ''
-                  }`}
-                >
-                  Muộn {timesheet.minutesLate}p
-                </Badge>
-              )}
-              {timesheet.minutesEarly > 0 && (
-                <Badge
-                  variant={hasPendingForms ? 'secondary' : 'destructive'}
-                  className={`text-xs px-1 py-0 ${
-                    hasPendingForms ? 'bg-orange-100 text-orange-800 border-orange-300' : ''
-                  }`}
-                >
-                  Sớm {timesheet.minutesEarly}p
-                </Badge>
-              )}
+              <Clock className="h-3 w-3 shrink-0" />
+              <span className="truncate">
+                {day.timeIn ?? '--:--'} - {day.timeOut ?? '--:--'}
+              </span>
             </>
           ) : (
             <span className="invisible">-</span>
           )}
         </div>
 
-        {/* Dòng 4: Work log */}
+        {/* Đi muộn / về sớm */}
+        <div className="flex items-center gap-1 flex-wrap min-h-4">
+          {day && (day.actual.minutesLate > 0 || day.actual.minutesEarly > 0) ? (
+            <>
+              <ViolationBadge
+                label="Muộn"
+                actual={day.actual.minutesLate}
+                covered={estimate?.covered.minutesLate ?? 0}
+                estimated={estimate?.estimated.minutesLate ?? 0}
+              />
+              <ViolationBadge
+                label="Sớm"
+                actual={day.actual.minutesEarly}
+                covered={estimate?.covered.minutesEarly ?? 0}
+                estimated={estimate?.estimated.minutesEarly ?? 0}
+              />
+            </>
+          ) : (
+            <span className="invisible">-</span>
+          )}
+        </div>
+
+        {/* Work log */}
         <div className="flex items-center gap-1 text-muted-foreground h-4">
-          {timesheet?.logWork ? (
+          {day?.logWork ? (
             <>
               <Briefcase className="h-3 w-3 shrink-0" />
-              <span>{timesheet.logWork.timeSpentHour}h</span>
-              {timesheet.logWorkDiff !== 0 && (
+              <span>{day.logWork.hours}h</span>
+              {day.logWork.diff !== 0 && (
                 <span
                   className={
-                    timesheet.logWorkDiff > 0 ? 'text-green-600' : 'text-destructive'
+                    day.logWork.diff > 0 ? 'text-green-600' : 'text-destructive'
                   }
                 >
-                  ({timesheet.logWorkDiff > 0 ? '+' : ''}
-                  {timesheet.logWorkDiff.toFixed(1)}h)
+                  ({day.logWork.diff > 0 ? '+' : ''}
+                  {day.logWork.diff.toFixed(1)}h)
                 </span>
               )}
             </>
@@ -177,42 +193,22 @@ export function TimesheetDayCell({
           )}
         </div>
 
-        {/* Dòng 5: Đơn từ */}
-        <div className="flex items-center justify-between gap-2 h-4 min-h-[16px]">
-          <div className="flex items-center gap-2 flex-wrap">
-            {timesheet && timesheet.approvedApplicationForms && timesheet.approvedApplicationForms.length > 0 ? (
+        {/* Đơn từ */}
+        <div className="flex items-center justify-between gap-2 min-h-4">
+          <div className="flex items-center gap-1 flex-wrap text-muted-foreground">
+            {day && day.forms.length > 0 ? (
               <>
-                <FileText className="h-3 w-3 text-muted-foreground shrink-0" />
-                <span className="text-muted-foreground">
-                  {timesheet.approvedApplicationForms.length} đơn
-                </span>
-                {/* Hiển thị các badge symbol bên cạnh số đơn */}
-                {timesheet.symbol && (
-                  <>
-                    {timesheet.symbol.split(',').map((s, index) => (
-                      <Badge key={index} variant="outline" className="text-xs px-1 py-0">
-                        {s.trim()}
-                      </Badge>
-                    ))}
-                  </>
+                <FileText className="h-3 w-3 shrink-0" />
+                <span>{day.forms.length} đơn</span>
+                {day.forms.some((form) => !form.isApproved) && (
+                  <span className="text-orange-700">(có đơn chờ duyệt)</span>
                 )}
-              </>
-            ) : timesheet?.symbol &&
-              (!timesheet.approvedApplicationForms ||
-                timesheet.approvedApplicationForms.length === 0) ? (
-              // Nếu có symbol nhưng không có đơn (trường hợp đặc biệt)
-              <>
-                {timesheet.symbol.split(',').map((s, index) => (
-                  <Badge key={index} variant="outline" className="text-xs px-1 py-0">
-                    {s.trim()}
-                  </Badge>
-                ))}
               </>
             ) : (
               <span className="invisible">-</span>
             )}
           </div>
-          {isLoading && (
+          {isLoadingDetail && (
             <Loader2 className="h-3 w-3 animate-spin text-muted-foreground shrink-0" />
           )}
         </div>

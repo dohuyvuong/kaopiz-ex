@@ -1,0 +1,74 @@
+{
+  "success": true,
+  "data": {
+    "timeSheets": [
+      {
+        "id": 3440873,
+        "time": "2026-07-31T09:05:12.000Z",
+        "machineCode": "M8"
+      },
+      {
+        "id": 3439889,
+        "time": "2026-07-31T09:07:15.000Z",
+        "machineCode": "FACE08"
+      },
+      {
+        "id": 3439890,
+        "time": "2026-07-31T09:07:18.000Z",
+        "machineCode": "FACE08"
+      },
+      {
+        "id": 3442450,
+        "time": "2026-07-31T15:55:34.000Z",
+        "machineCode": "T4_aws_out"
+      },
+      {
+        "id": 3442436,
+        "time": "2026-07-31T15:55:58.000Z",
+        "machineCode": "T4_aws_in"
+      }
+    ],
+    "applicationForms": [
+      {
+        "id": 119164,
+        "typeId": 1,
+        "projectId": null,
+        "startDate": "2026-07-31T00:00:00.000Z",
+        "endDate": "2026-07-31T00:00:00.000Z",
+        "status": 3,
+        "data": {
+          "trackingTimes": [
+            {
+              "timeStart": "15:55",
+              "timeEnd": "17:30"
+            }
+          ]
+        },
+        "type": {
+          "id": 1,
+          "name": "Đơn xin nghỉ"
+        }
+      },
+      {
+        "id": 119275,
+        "typeId": 1,
+        "projectId": null,
+        "startDate": "2026-07-31T00:00:00.000Z",
+        "endDate": "2026-07-31T00:00:00.000Z",
+        "status": 1,
+        "data": {
+          "trackingTimes": [
+            {
+              "timeStart": "08:30",
+              "timeEnd": "08:55"
+            }
+          ]
+        },
+        "type": {
+          "id": 1,
+          "name": "Đơn xin nghỉ"
+        }
+      }
+    ]
+  }
+}

@@ -1,637 +1,313 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+'use client';
+
+/**
+ * Trạng thái form tạo đơn.
+ *
+ * Khác bản cũ ở chỗ: KHÔNG chặn người dùng. Mọi ràng buộc đoán được đều hiển thị
+ * dưới dạng cảnh báo (`warnings`), còn quyết định cuối thuộc về HRM — nếu HRM từ
+ * chối thì ta hiện nguyên văn lý do. Bản cũ tự chặn theo suy đoán, mà suy đoán
+ * lại lệch với chính phần auto-create của nó.
+ */
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { applicationApi } from '@/lib/api/application';
+import { extractErrorMessage } from '@/lib/api/error-message';
 import {
-  CreateApplicationFormPayload,
-  ApplicationFormType,
   ApplicationFormReason,
+  ApplicationFormType,
   ApprovalAssignment,
+  CreateApplicationFormPayload,
 } from '@/lib/types/application';
 import {
   ApproverPreferences,
   ApproverPreferencesHelper,
 } from '@/lib/types/approver-preferences';
-import { TimesheetDay } from '@/lib/types/timesheet';
-import { DayDetailApplicationForm } from '@/lib/types/timesheet-day-detail';
-import dayjs from 'dayjs';
 import {
-  checkOverlappingForms,
-  checkAbsenceFormInWeek,
-  getMissingTimeRanges,
-  calculateMinutes,
-} from '@/lib/utils/application-form';
+  CalendarDay,
+  FormType,
+  Reason,
+  RuleWarning,
+  TimesheetRules,
+  checkDraftForm,
+  suggestIntervalForDay,
+  toMinutes,
+} from '@kaopiz/timesheet';
 
-interface UseCreateApplicationFormProps {
+interface UseCreateApplicationFormOptions {
   open: boolean;
   date: string;
-  calendarDay?: TimesheetDay | null;
-  workingTime?: { workStart: string; workEnd: string } | null;
-  calendarDays?: Array<{ date: Date; timesheet: TimesheetDay | null }>;
-  mergedDays?: Map<string, TimesheetDay & { hasPendingForms?: boolean }>;
-  dayDetail?: { applicationForms?: DayDetailApplicationForm[] } | null;
-  userId?: number; // User ID từ calendar response
+  day: CalendarDay | null;
+  rules: TimesheetRules | null;
+  daysByDate: Map<string, CalendarDay>;
+  userId?: number;
+  today: string;
 }
 
-interface UseCreateApplicationFormReturn {
-  // Form state
-  typeId: number;
-  setTypeId: (typeId: number) => void;
-  reasonId: number | null;
-  setReasonId: (reasonId: number | null) => void;
-  approverIds: (number | null)[];
-  setApproverId: (order: number, approverId: number | null) => void;
-  timeStart: string;
-  setTimeStart: (timeStart: string) => void;
-  timeEnd: string;
-  setTimeEnd: (timeEnd: string) => void;
-
-  // Data
-  types: ApplicationFormType[];
-  reasons: ApplicationFormReason[];
-  selectedType: ApplicationFormType | null;
-  availableReasons: ApplicationFormReason[];
-  selectedReason: ApplicationFormReason | null;
-  selectedReasonDisplayName: string | null;
-  approvers: ApprovalAssignment[][]; // Array of arrays, index = order (0-based)
-  loadingApprovers: boolean;
-
-  // UI state
-  loading: boolean;
-  loadingTypes: boolean;
-  error: string | null;
-  validationError: string | null;
-  warningMessage: string | null;
-
-  // Computed values
-  minutes: number | null;
-
-  // Actions
-  handleSubmit: () => Promise<boolean>;
-  validate: () => boolean;
-}
-
+/** Lý do mặc định cho từng loại đơn, khớp thói quen dùng thực tế. */
+const DEFAULT_REASON_BY_TYPE: Record<number, number> = {
+  [FormType.LEAVE]: Reason.ANNUAL_LEAVE,
+  [FormType.ABSENCE]: Reason.SHIFT_ADJUSTMENT,
+};
 
 export function useCreateApplicationForm({
   open,
   date,
-  calendarDay,
-  workingTime,
-  calendarDays,
-  mergedDays,
-  dayDetail,
+  day,
+  rules,
+  daysByDate,
   userId,
-}: UseCreateApplicationFormProps): UseCreateApplicationFormReturn {
+  today,
+}: UseCreateApplicationFormOptions) {
   const appToken = useAuthStore((state) => state.appToken);
-  const [, setPreferences] = useState<ApproverPreferences>([]);
 
-  const [typeId, setTypeId] = useState<number>(2);
+  const [typeId, setTypeId] = useState<number>(FormType.ABSENCE);
   const [reasonId, setReasonId] = useState<number | null>(null);
-  const [approverIds, setApproverIds] = useState<(number | null)[]>([]);
-  const prevTypeIdRef = useRef<number | null>(null);
-  const [timeStart, setTimeStart] = useState<string>('');
-  const [timeEnd, setTimeEnd] = useState<string>('');
-  const [loading, setLoading] = useState(false);
-  const [loadingTypes, setLoadingTypes] = useState(false);
-  const [loadingApprovers, setLoadingApprovers] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [validationError, setValidationError] = useState<string | null>(null);
-  const [warningMessage, setWarningMessage] = useState<string | null>(null);
+  const [timeStart, setTimeStart] = useState('');
+  const [timeEnd, setTimeEnd] = useState('');
+
   const [types, setTypes] = useState<ApplicationFormType[]>([]);
   const [reasons, setReasons] = useState<ApplicationFormReason[]>([]);
   const [approvers, setApprovers] = useState<ApprovalAssignment[][]>([]);
+  const [approverIds, setApproverIds] = useState<(number | null)[]>([]);
+  const [, setPreferences] = useState<ApproverPreferences>([]);
 
-  // Tính số phút
-  const minutes = calculateMinutes(timeStart, timeEnd);
+  const [isLoadingTypes, setIsLoadingTypes] = useState(false);
+  const [isLoadingApprovers, setIsLoadingApprovers] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Selected type và available reasons
-  const selectedType = types.find((t) => t.id === typeId) || null;
-  // Reasons đã được filter theo typeId từ API, nên dùng trực tiếp
-  const availableReasons = reasons;
+  const selectedType = types.find((type) => type.id === typeId) ?? null;
+  const approverCount = selectedType?.orderMax ?? 0;
 
-  // Selected reason với text rút gọn
-  const selectedReason = availableReasons.find((r) => r.id === reasonId) || null;
-  const selectedReasonDisplayName = selectedReason
-    ? selectedReason.name.length > 50
-      ? `${selectedReason.name.substring(0, 50)}...`
-      : selectedReason.name
-    : null;
+  const minutes = useMemo(() => {
+    const from = toMinutes(timeStart);
+    const to = toMinutes(timeEnd);
+    if (from == null || to == null || to <= from) return null;
+    return to - from;
+  }, [timeStart, timeEnd]);
 
-  // Fetch types khi mở dialog
+  /* ------------------------------------------------------------ master data */
+
   useEffect(() => {
-    if (open && appToken) {
-      const fetchTypes = async () => {
-        setLoadingTypes(true);
-        try {
-          // Fetch types
-          const typesResponse = await applicationApi.getFormTypes();
-          setTypes(typesResponse.items || []);
-        } catch (err) {
-          console.error('Failed to fetch form types:', err);
-          // Fallback to hardcoded types nếu API fail
-          setTypes([
-            { id: 1, name: 'Đơn xin nghỉ', orderMax: 2 },
-            { id: 2, name: 'Đơn vắng mặt', orderMax: 1 },
-          ]);
-        } finally {
-          setLoadingTypes(false);
-        }
-      };
-
-      fetchTypes();
-    }
+    if (!open || !appToken) return;
+    setIsLoadingTypes(true);
+    applicationApi
+      .getFormTypes()
+      .then((response) => setTypes(response.items ?? []))
+      .catch(() => setTypes([]))
+      .finally(() => setIsLoadingTypes(false));
   }, [open, appToken]);
 
-  // Fetch reasons khi typeId thay đổi
   useEffect(() => {
-    if (open && appToken && typeId) {
-      const fetchReasons = async () => {
-        try {
-          const reasonsResponse = await applicationApi.getReasons(
-            typeId,
-          );
-          setReasons(reasonsResponse.items || []);
+    if (!open || !appToken || !typeId) return;
+    applicationApi
+      .getReasons(typeId)
+      .then((response) => {
+        const items = response.items ?? [];
+        setReasons(items);
+        const preferred = DEFAULT_REASON_BY_TYPE[typeId];
+        const fallback = items[0]?.id ?? null;
+        setReasonId(
+          items.some((item) => item.id === preferred) ? preferred : fallback,
+        );
+      })
+      .catch(() => setReasons([]));
+  }, [open, appToken, typeId]);
 
-          // Tự động chọn reasonId dựa trên typeId và calendarDay
-          if (typeId === 1) {
-            // Đơn xin nghỉ: tự động chọn "Nghỉ phép năm" (reasonId = 4)
-            const annualLeaveReason = reasonsResponse.items?.find(
-              (r) => r.id === 4,
-            );
-            if (annualLeaveReason) {
-              setReasonId(4);
-            } else if (reasonsResponse.items && reasonsResponse.items.length > 0) {
-              setReasonId(reasonsResponse.items[0].id);
-            }
-          } else if (typeId === 2) {
-            // Đơn vắng mặt: nếu có dữ liệu chấm công thì chọn "Thay đổi thời gian làm việc" (reasonId = 21)
-            if (calendarDay && (calendarDay.timeIn || calendarDay.timeOut)) {
-              const changeWorkTimeReason = reasonsResponse.items?.find(
-                (r) => r.id === 21,
-              );
-              if (changeWorkTimeReason) {
-                setReasonId(21);
-              } else if (reasonsResponse.items && reasonsResponse.items.length > 0) {
-                setReasonId(reasonsResponse.items[0].id);
-              }
-            } else if (reasonsResponse.items && reasonsResponse.items.length > 0) {
-              setReasonId(reasonsResponse.items[0].id);
-            }
-          }
-        } catch (err) {
-          console.error('Failed to fetch reasons:', err);
-          setReasons([]);
-        }
-      };
-
-      fetchReasons();
-    }
-  }, [typeId, open, appToken, calendarDay]);
-
-  // Số lượng người duyệt cho từng loại đơn (orderMax = số lượng người duyệt)
-  const getApproverCount = useCallback((type: ApplicationFormType | null): number => {
-    if (!type) return 0;
-    // orderMax là số lượng người duyệt (1-based), nhưng chúng ta dùng 0-based index
-    return type.orderMax;
-  }, []);
-
-  // Fetch approver preferences + người duyệt khi mở form / typeId thay đổi
   useEffect(() => {
-    if (!open || !appToken || !typeId || !selectedType || !userId) {
+    if (!open || !appToken || !userId || !selectedType) {
       setApprovers([]);
       setApproverIds([]);
       return;
     }
 
-    const fetchAll = async () => {
-      setLoadingApprovers(true);
-      try {
-        const [prefsRes, ...approverResponses] = await Promise.all([
-          applicationApi.getApproverPreferences(),
-          ...Array.from({ length: getApproverCount(selectedType) }, (_, order) =>
-            applicationApi.getApprovalAssignments(
-              typeId,
-              order + 1,
-              userId,
-            ),
-          ),
-        ]);
+    setIsLoadingApprovers(true);
+    Promise.all([
+      applicationApi.getApproverPreferences(),
+      ...Array.from({ length: selectedType.orderMax }, (_, index) =>
+        applicationApi.getApprovalAssignments(typeId, index + 1, userId),
+      ),
+    ])
+      .then(([preferencesResponse, ...assignmentResponses]) => {
+        const saved = preferencesResponse.preferences ?? [];
+        setPreferences(saved);
 
-        const prefs = prefsRes.preferences ?? [];
-        setPreferences(prefs);
-
-        const currentTypeApprovers =
-          ApproverPreferencesHelper.getByTypeId(prefs, typeId);
-        const approversArray: ApprovalAssignment[][] = [];
-        const approverIdsArray: (number | null)[] = [];
-
-        approverResponses.forEach((response, order) => {
-          const apiOrder = order + 1;
-          const items = response.items || [];
-          approversArray.push(items);
-
-          const savedApproverId = currentTypeApprovers[apiOrder] ?? null;
-          if (savedApproverId && items.some((a) => a.userId === savedApproverId)) {
-            approverIdsArray[order] = savedApproverId;
-          } else {
-            approverIdsArray[order] = null;
-          }
-        });
-
-        setApprovers(approversArray);
-        setApproverIds(approverIdsArray);
-      } catch (err) {
-        console.error('Failed to fetch approvers:', err);
+        const savedForType = ApproverPreferencesHelper.getByTypeId(
+          saved,
+          typeId,
+        );
+        const lists = assignmentResponses.map(
+          (response) => response.items ?? [],
+        );
+        setApprovers(lists);
+        setApproverIds(
+          lists.map((list, index) => {
+            const savedId = savedForType[index + 1] ?? null;
+            return savedId && list.some((item) => item.userId === savedId)
+              ? savedId
+              : null;
+          }),
+        );
+      })
+      .catch(() => {
         setApprovers([]);
         setApproverIds([]);
-      } finally {
-        setLoadingApprovers(false);
-      }
-    };
+      })
+      .finally(() => setIsLoadingApprovers(false));
+  }, [open, appToken, userId, selectedType, typeId]);
 
-    fetchAll();
-  }, [typeId, open, appToken, selectedType, userId, getApproverCount]);
+  /* ------------------------------------------------ giá trị mặc định khi mở */
 
-  // Reset approverIds khi typeId thay đổi
   useEffect(() => {
-    const prevTypeId = prevTypeIdRef.current;
+    if (!open) return;
+    setError(null);
+    setTypeId(FormType.ABSENCE);
+  }, [open, date]);
 
-    // Nếu typeId thay đổi, reset approverIds
-    if (prevTypeId !== null && prevTypeId !== typeId) {
-      setApproverIds([]);
-    }
+  // Gợi ý khoảng giờ dựa trên phần vi phạm chưa được đơn nào che.
+  useEffect(() => {
+    if (!open || !day || !rules) return;
+    const limit =
+      typeId === FormType.ABSENCE
+        ? rules.reasonLimits.get(Reason.SHIFT_ADJUSTMENT)?.maxMinutesInDay
+        : undefined;
 
-    // Cập nhật prevTypeIdRef
-    prevTypeIdRef.current = typeId;
-  }, [typeId]);
+    const suggestion = suggestIntervalForDay(day, rules, {
+      maxMinutes: limit ?? undefined,
+    });
+    setTimeStart(suggestion?.timeStart ?? rules.workStart);
+    setTimeEnd(suggestion?.timeEnd ?? rules.workEnd);
+  }, [open, day, rules, typeId]);
 
-  // Helper để set approverId theo order (0-based)
+  /* ----------------------------------------------------------- cảnh báo */
+
+  const warnings = useMemo<RuleWarning[]>(() => {
+    if (!open || !rules || !timeStart || !timeEnd) return [];
+    return checkDraftForm(
+      { date, typeId, reasonId, timeStart, timeEnd },
+      { daysByDate, rules, today },
+    );
+  }, [open, rules, date, typeId, reasonId, timeStart, timeEnd, daysByDate, today]);
+
   const setApproverId = useCallback(
     (order: number, approverId: number | null) => {
       setApproverIds((prev) => {
-        const newIds = [...prev];
-        newIds[order] = approverId;
-        return newIds;
+        const next = [...prev];
+        next[order] = approverId;
+        return next;
       });
-
-      if (typeId && selectedType) {
-        const apiOrder = order + 1;
-        setPreferences((prev) => {
-          const next = ApproverPreferencesHelper.set(
-            prev,
-            typeId,
-            apiOrder,
-            approverId,
-          );
-          applicationApi.saveApproverPreferences(next).catch(console.error);
-          return next;
-        });
-      }
-    },
-    [typeId, selectedType],
-  );
-
-  // Tính toán thời gian tự động dựa trên typeId và calendarDay
-  const calculateAutoTime = useCallback(
-    (targetTypeId: number): { timeStart: string; timeEnd: string } => {
-      const workStart = workingTime?.workStart || '08:30';
-      const workEnd = workingTime?.workEnd || '17:30';
-
-      if (targetTypeId === 2 && calendarDay) {
-        // Đơn Vắng mặt - Thay đổi thời gian làm việc
-        if (calendarDay.minutesLate > 0 && calendarDay.timeIn) {
-          // Đi muộn: từ workStart đến tối đa 1 tiếng (hoặc timeIn nếu sớm hơn)
-          const workStartTime = dayjs(`2000-01-01 ${workStart}`, 'YYYY-MM-DD HH:mm');
-          const maxEndTime = workStartTime.add(60, 'minute');
-          const timeInTime = dayjs(`2000-01-01 ${calendarDay.timeIn}`, 'YYYY-MM-DD HH:mm');
-          const finalEndTime = timeInTime.isBefore(maxEndTime) ? timeInTime : maxEndTime;
-          return {
-            timeStart: workStart,
-            timeEnd: finalEndTime.format('HH:mm'),
-          };
-        }
-        if (calendarDay.minutesEarly > 0 && calendarDay.timeOut) {
-          // Về sớm: từ tối đa 1 tiếng trước workEnd (hoặc timeOut nếu muộn hơn) đến workEnd
-          const workEndTime = dayjs(`2000-01-01 ${workEnd}`, 'YYYY-MM-DD HH:mm');
-          const minStartTime = workEndTime.subtract(60, 'minute');
-          const timeOutTime = dayjs(`2000-01-01 ${calendarDay.timeOut}`, 'YYYY-MM-DD HH:mm');
-          const finalStartTime = timeOutTime.isAfter(minStartTime) ? timeOutTime : minStartTime;
-          return {
-            timeStart: finalStartTime.format('HH:mm'),
-            timeEnd: workEnd,
-          };
-        }
-        // Xác định khoảng thời gian thiếu chấm công
-        const missingRanges = getMissingTimeRanges(calendarDay, workingTime);
-        if (missingRanges.length > 0) {
-          return {
-            timeStart: missingRanges[0].start,
-            timeEnd: missingRanges[0].end,
-          };
-        }
-        return { timeStart: workStart, timeEnd: workEnd };
-      }
-
-      if (targetTypeId === 1) {
-        // Đơn Nghỉ phép
-        if (calendarDay?.timeIn && calendarDay?.timeOut) {
-          // Có chấm công -> không thể làm đơn cả ngày, cần xác định khoảng thời gian thiếu
-          const missingRanges = getMissingTimeRanges(calendarDay, workingTime);
-          if (missingRanges.length > 0) {
-            return {
-              timeStart: missingRanges[0].start,
-              timeEnd: missingRanges[0].end,
-            };
-          }
-          // Không có khoảng thiếu -> để trống
-          return { timeStart: '', timeEnd: '' };
-        }
-        // Không có chấm công hoặc thiếu một phần -> có thể làm đơn cả ngày
-        return { timeStart: workStart, timeEnd: workEnd };
-      }
-
-      return { timeStart: workStart, timeEnd: workEnd };
-    },
-    [calendarDay, workingTime],
-  );
-
-  // Helper function để tạo dayDetailMap
-  const createDayDetailMap = useCallback((): Map<string, { applicationForms?: DayDetailApplicationForm[] }> => {
-    const dayDetailMap = new Map<string, { applicationForms?: DayDetailApplicationForm[] }>();
-    if (dayDetail?.applicationForms && !mergedDays) {
-      const dayDate = dayjs(date);
-      calendarDays?.forEach(({ date: dayDateItem }) => {
-        const dateStr = dayjs(dayDateItem).format('YYYY-MM-DD');
-        if (dayjs(dateStr).isSame(dayDate, 'day')) {
-          dayDetailMap.set(dateStr, { applicationForms: dayDetail.applicationForms });
-        }
-      });
-    }
-    return dayDetailMap;
-  }, [dayDetail, mergedDays, date, calendarDays]);
-
-  // Hàm tập trung để tính toán warningMessage cho tất cả các trường hợp
-  const getWarningMessage = useCallback((): string | null => {
-    if (!open) return null;
-
-    // 1. Kiểm tra overlap (ưu tiên cao nhất)
-    if (timeStart && timeEnd) {
-      const hasOverlap = checkOverlappingForms(
-        timeStart,
-        timeEnd,
-        calendarDay,
-        dayDetail,
-      );
-      if (hasOverlap) {
-        return 'Ngày này đã có đơn trùng lặp thời gian. Vui lòng kiểm tra lại.';
-      }
-    }
-
-    // 2. Kiểm tra quá hạn làm đơn
-    const selectedDate = dayjs(date);
-    const today = dayjs();
-    const minDate = today.subtract(7, 'day'); // 7 ngày trước từ hôm nay
-    if (selectedDate.isBefore(minDate, 'day')) {
-      return 'Đã quá hạn làm đơn cho ngày này';
-    }
-
-    // 3. Kiểm tra đã có đơn vắng mặt trong tuần (chỉ khi typeId === 2)
-    if (typeId === 2) {
-      const dayDetailMap = createDayDetailMap();
-      const hasAbsenceFormInWeek = checkAbsenceFormInWeek(date, calendarDays, dayDetailMap, mergedDays);
-      if (hasAbsenceFormInWeek) {
-        return 'Đã có 2 đơn vắng mặt (Thay đổi thời gian làm việc) trong tuần này. Một tuần chỉ có thể có tối đa 2 đơn vắng mặt. Vui lòng tạo đơn xin nghỉ phép thay thế.';
-      }
-    }
-
-    return null;
-  }, [open, timeStart, timeEnd, calendarDay, dayDetail, date, typeId, calendarDays, mergedDays, createDayDetailMap]);
-
-  // Tính toán và set warningMessage khi các dependencies thay đổi
-  useEffect(() => {
-    const message = getWarningMessage();
-    setWarningMessage(message);
-  }, [getWarningMessage]);
-
-  // Reset form khi mở dialog
-  useEffect(() => {
-    if (open) {
-      setError(null);
-      setValidationError(null);
-
-      // Kiểm tra đã có đơn vắng mặt trong tuần chưa để quyết định typeId ban đầu
-      const dayDetailMap = createDayDetailMap();
-      const hasAbsenceFormInWeek = checkAbsenceFormInWeek(date, calendarDays, dayDetailMap, mergedDays);
-      const initialTypeId = hasAbsenceFormInWeek ? 1 : 2;
-      setTypeId(initialTypeId);
-
-      // Tính toán thời gian tự động
-      const autoTime = calculateAutoTime(initialTypeId);
-      setTimeStart(autoTime.timeStart);
-      setTimeEnd(autoTime.timeEnd);
-    }
-  }, [open, date, calendarDays, mergedDays, dayDetail, calculateAutoTime, createDayDetailMap]);
-
-  // Tự động tính toán lại khi typeId thay đổi
-  useEffect(() => {
-    if (open) {
-      // Tính toán lại thời gian
-      const autoTime = calculateAutoTime(typeId);
-      setTimeStart(autoTime.timeStart);
-      setTimeEnd(autoTime.timeEnd);
-    }
-  }, [typeId, open, calculateAutoTime]);
-
-  // Validation
-  const validate = useCallback((): boolean => {
-    setValidationError(null);
-
-    // Kiểm tra tất cả người duyệt đều được chọn
-    if (selectedType) {
-      const approverCount = getApproverCount(selectedType);
-      for (let order = 0; order < approverCount; order++) {
-        if (!approverIds[order]) {
-          setValidationError(
-            `Vui lòng chọn người duyệt ${order + 1}`,
-          );
-          return false;
-        }
-      }
-    }
-
-    // Kiểm tra đơn Nghỉ phép: nếu có chấm công thì không thể làm đơn cả ngày
-    if (typeId === 1) {
-      if (calendarDay && calendarDay.timeIn && calendarDay.timeOut) {
-        const workStart = workingTime?.workStart || '08:30';
-        const workEnd = workingTime?.workEnd || '17:30';
-        const isFullDay =
-          !timeStart || !timeEnd || (timeStart === workStart && timeEnd === workEnd);
-
-        if (isFullDay) {
-          setValidationError(
-            'Không thể tạo đơn nghỉ phép cả ngày khi đã có chấm công. Vui lòng chọn khoảng thời gian cụ thể.',
-          );
-          return false;
-        }
-      }
-    }
-
-    // Kiểm tra đơn Vắng mặt - Thay đổi thời gian làm việc
-    if (typeId === 2) {
-      // Điều kiện: ngày đó phải làm đủ ít nhất 8 tiếng (thời gian hiệu quả = timeOut - timeIn - nghỉ trưa 1h - phút về sớm)
-      const LUNCH_BREAK_MINUTES = 60; // 1 giờ nghỉ trưa không tính vào giờ làm
-      if (calendarDay?.timeIn && calendarDay?.timeOut) {
-        const timeInTime = dayjs(`2000-01-01 ${calendarDay.timeIn}`, 'YYYY-MM-DD HH:mm');
-        const timeOutTime = dayjs(`2000-01-01 ${calendarDay.timeOut}`, 'YYYY-MM-DD HH:mm');
-        const rawMinutes = timeOutTime.diff(timeInTime, 'minute');
-        const minutesEarly = (calendarDay as { minutesEarly?: number }).minutesEarly ?? 0;
-        const effectiveWorkMinutes = rawMinutes - LUNCH_BREAK_MINUTES - minutesEarly;
-        const requiredWorkMinutes = 8 * 60; // 8 tiếng = 480 phút
-        if (effectiveWorkMinutes < requiredWorkMinutes) {
-          setValidationError(
-            'Đơn Vắng mặt (Thay đổi thời gian làm việc) chỉ được tạo khi ngày đó làm đủ ít nhất 8 tiếng (sau khi trừ nghỉ trưa 1h và phần về sớm).',
-          );
-          return false;
-        }
-      }
-
-      if (!timeStart || !timeEnd) {
-        setValidationError('Vui lòng nhập thời gian bắt đầu và kết thúc');
-        return false;
-      }
-
-      const calculatedMinutes = calculateMinutes(timeStart, timeEnd);
-      if (calculatedMinutes === null) {
-        setValidationError('Thời gian không hợp lệ');
-        return false;
-      }
-
-      if (calculatedMinutes <= 0) {
-        setValidationError('Thời gian kết thúc phải sau thời gian bắt đầu');
-        return false;
-      }
-
-      // Kiểm tra một tuần chỉ có 1 đơn Vắng mặt - Thay đổi thời gian làm việc
-      // Tạo map từ dayDetail để kiểm tra pending forms (fallback nếu không có mergedDays)
-      const dayDetailMap = new Map<string, { applicationForms?: DayDetailApplicationForm[] }>();
-      if (dayDetail?.applicationForms && !mergedDays) {
-        // Chỉ tạo map nếu không có mergedDays (mergedDays đã có data cho tất cả các ngày)
-        const dayDate = dayjs(date);
-        calendarDays?.forEach(({ date: dayDateItem }) => {
-          const dateStr = dayjs(dayDateItem).format('YYYY-MM-DD');
-          if (dayjs(dateStr).isSame(dayDate, 'day')) {
-            dayDetailMap.set(dateStr, { applicationForms: dayDetail.applicationForms });
-          }
-        });
-      }
-      const hasAbsenceFormInWeek = checkAbsenceFormInWeek(date, calendarDays, dayDetailMap, mergedDays);
-      if (hasAbsenceFormInWeek) {
-        setValidationError(
-          'Một tuần chỉ có thể có tối đa 2 đơn vắng mặt (Thay đổi thời gian làm việc). Vui lòng tạo đơn xin nghỉ phép thay thế.',
+      setPreferences((prev) => {
+        const next = ApproverPreferencesHelper.set(
+          prev,
+          typeId,
+          order + 1,
+          approverId,
         );
-        return false;
-      }
-    }
+        void applicationApi.saveApproverPreferences(next).catch(() => {
+          // Ghi nhớ người duyệt chỉ là tiện lợi, hỏng thì bỏ qua.
+        });
+        return next;
+      });
+    },
+    [typeId],
+  );
 
-    return true;
-  }, [date, typeId, timeStart, timeEnd, calendarDay, workingTime, calendarDays, mergedDays, selectedType, approverIds, dayDetail]);
+  const missingApproverOrder = approverIds
+    .slice(0, approverCount)
+    .findIndex((id) => !id);
+  const canSubmit =
+    !isSubmitting &&
+    minutes != null &&
+    reasonId != null &&
+    (approverCount === 0 || missingApproverOrder === -1);
 
-  // Handle submit
-  const handleSubmit = useCallback(async (): Promise<boolean> => {
-    if (!validate()) return false;
-
+  const submit = useCallback(async (): Promise<boolean> => {
     if (!appToken) {
       setError('Chưa đăng nhập với HRM. Vui lòng đăng nhập.');
       return false;
     }
 
-    setLoading(true);
+    setIsSubmitting(true);
     setError(null);
-
     try {
-      const selectedReason = reasons.find((r) => r.id === reasonId);
-      const trackingTimeReasonId = selectedReason?.id || reasonId;
-
-      // Tạo danh sách applicationApprovals
-      const applicationApprovals: Array<{ userId: number; order: number }> =
-        [];
-      const approverCount = getApproverCount(selectedType);
-      for (let order = 0; order < approverCount; order++) {
-        const approverId = approverIds[order];
-        if (approverId) {
-          // API dùng 1-based order
-          applicationApprovals.push({ userId: approverId, order: order + 1 });
-        }
-      }
+      // Đơn xin nghỉ dùng dateStart/dateEnd, đơn vắng mặt dùng date — theo đúng
+      // shape HRM chờ đợi cho từng loại.
+      const tracking =
+        typeId === FormType.LEAVE
+          ? {
+              dateStart: date,
+              dateEnd: date,
+              timeStart,
+              timeEnd,
+              reasonId: reasonId ?? undefined,
+            }
+          : {
+              date,
+              timeStart,
+              timeEnd,
+              reasonId: reasonId ?? undefined,
+            };
 
       const payload: CreateApplicationFormPayload = {
         typeId,
         startDate: date,
         endDate: date,
-        data: {
-          reasonId: reasonId || undefined,
-          trackingTimes:
-            typeId === 2 && timeStart && timeEnd
-              ? [
-                  {
-                    date,
-                    timeStart,
-                    timeEnd,
-                    reasonId: trackingTimeReasonId || undefined,
-                  },
-                ]
-              : typeId === 1
-                ? [
-                    {
-                      dateStart: date,
-                      dateEnd: date,
-                      timeStart: timeStart || undefined,
-                      timeEnd: timeEnd || undefined,
-                      reasonId: trackingTimeReasonId || undefined,
-                    },
-                  ]
-                : undefined,
-        },
-        applicationApprovals:
-          applicationApprovals.length > 0 ? applicationApprovals : undefined,
-        description: selectedType?.name || 'Đơn từ',
+        data: { reasonId: reasonId ?? undefined, trackingTimes: [tracking] },
+        applicationApprovals: approverIds
+          .slice(0, approverCount)
+          .flatMap((id, index) =>
+            id ? [{ userId: id, order: index + 1 }] : [],
+          ),
+        description: selectedType?.name ?? 'Đơn từ',
       };
 
       await applicationApi.createApplicationForm(payload);
       return true;
-    } catch {
-      setError('Lỗi khi tạo đơn từ');
+    } catch (err) {
+      setError(extractErrorMessage(err, 'Không tạo được đơn từ'));
       return false;
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
-  }, [validate, appToken, typeId, date, timeStart, timeEnd, reasonId, reasons, selectedType, approverIds, getApproverCount]);
+  }, [
+    appToken,
+    typeId,
+    date,
+    timeStart,
+    timeEnd,
+    reasonId,
+    approverIds,
+    approverCount,
+    selectedType,
+  ]);
 
   return {
     typeId,
     setTypeId,
     reasonId,
     setReasonId,
-    approverIds,
-    setApproverId,
     timeStart,
     setTimeStart,
     timeEnd,
     setTimeEnd,
+    minutes,
+
     types,
     reasons,
     selectedType,
-    availableReasons,
-    selectedReason,
-    selectedReasonDisplayName,
     approvers,
-    loadingApprovers,
-    loading,
-    loadingTypes,
+    approverIds,
+    setApproverId,
+    approverCount,
+
+    warnings,
     error,
-    validationError,
-    warningMessage,
-    minutes,
-    handleSubmit,
-    validate,
+    isLoadingTypes,
+    isLoadingApprovers,
+    isSubmitting,
+    canSubmit,
+    missingApproverOrder,
+    submit,
   };
 }

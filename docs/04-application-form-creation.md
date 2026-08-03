@@ -1,364 +1,69 @@
-# Application Form Creation
+# Tạo đơn từ
 
-## Tổng quan
+Dialog mở từ panel chi tiết ngày.
 
-Module này cho phép người dùng tạo đơn từ (application form) thủ công cho một ngày cụ thể. Hỗ trợ 2 loại đơn chính:
-- **Đơn xin nghỉ** (typeId: 1)
-- **Đơn vắng mặt** (typeId: 2)
+| File | Vai trò |
+|---|---|
+| `frontend/components/timesheet/CreateApplicationFormDialog.tsx` | giao diện |
+| `frontend/hooks/use-create-application-form.ts` | state, gọi API |
+| `shared/src/rules.ts` | tính cảnh báo |
 
-## Component Structure
+## Nguyên tắc: cảnh báo, không chặn
 
-### Main Component
+**HRM là nơi quyết định đơn có hợp lệ hay không.** Nó biết những thứ ta không biết: đơn ở tháng khác, cấu hình riêng của phòng ban, ngoại lệ do quản lý duyệt.
 
-**File**: `frontend/components/timesheet/CreateApplicationFormDialog.tsx`
+Ta đoán sai mà **chặn** → người dùng không làm được việc.
+Ta đoán sai mà **cảnh báo** → họ đọc thêm một dòng rồi vẫn gửi được.
 
-Dialog component sử dụng Shadcn UI Dialog.
+Nên mọi ràng buộc nghiệp vụ đều hiện dưới dạng cảnh báo vàng, kèm dòng *"Vẫn gửi được — HRM sẽ quyết định"*. Khi HRM từ chối, hiển thị **nguyên văn** lý do của nó.
 
-### Custom Hook: useCreateApplicationForm
+Chỉ còn hai thứ thuần kỹ thuật là chặn thật, vì gửi đi chắc chắn hỏng:
 
-**File**: `frontend/hooks/use-create-application-form.ts`
+- giờ kết thúc không sau giờ bắt đầu
+- chưa chọn đủ người duyệt
 
-Hook quản lý toàn bộ logic của form creation.
+> Bản cũ chặn theo suy đoán, mà suy đoán lại **lệch với chính phần auto-create của
+> nó**: auto-create chấp nhận điều kiện "về muộn bù giờ", còn hàm validate thì
+> không — nên tool tự sinh ra đơn mà nếu người dùng tạo tay sẽ bị chặn.
 
-## Form Fields
+## Năm loại cảnh báo
 
-### Type Selection
+`checkDraftForm` trả về danh sách, tất cả cùng mức:
 
-- Dropdown chọn loại đơn (typeId)
-- Mặc định: typeId = 2 (Đơn vắng mặt)
-- Nếu đã có đơn vắng mặt trong tuần, mặc định: typeId = 1
+| Mã | Khi nào |
+|---|---|
+| `reason-week-limit` | tuần đã dùng hết số lần cho phép của lý do đó |
+| `reason-minutes-limit` | đơn dài quá `maxMinutesInDay` của lý do |
+| `submission-deadline` | quá hạn nộp tính từ ngày áp dụng |
+| `insufficient-work-hours` | ngày đó có thể chưa đủ giờ làm |
+| `overlapping-form` | trùng giờ với đơn đã có trong ngày |
 
-**Code reference**: `frontend/hooks/use-create-application-form.ts:89, 427-428`
+Mọi ngưỡng đọc từ HRM (`reasonLimits`, `maxDaysAfterByType`), không hardcode. Xem [02-timesheet-calendar.md](./02-timesheet-calendar.md#2-ràng-buộc-nghiệp-vụ-là-dữ-liệu-không-phải-hằng-số).
 
-### Reason Selection
+Đơn kề nhau **không** tính là trùng: đơn cũ `08:30–08:45` và đơn mới `08:45–09:00` là hợp lệ. Mốc giờ của đơn checkin/out cũng không tính là trùng khoảng, vì nó là một điểm chứ không phải khoảng.
 
-- Dropdown chọn lý do (reasonId)
-- Chỉ hiển thị reasons phù hợp với typeId đã chọn
-- Mặc định: null
+## Gợi ý khoảng giờ
 
-**Code reference**: `frontend/hooks/use-create-application-form.ts:90, 140-180`
+Khi mở dialog, `suggestIntervalForDay` điền sẵn khoảng giờ: lấy chiều vi phạm nặng hơn, rồi lấy **khoảng trống đầu tiên chưa bị đơn nào chiếm**.
 
-### Approver Selection
+Nhờ vậy mở dialog lần thứ hai sẽ đề xuất khoảng nối tiếp, không lặp lại khoảng đã có đơn.
 
-- Combobox chọn người duyệt cho từng order
-- Số lượng approvers phụ thuộc vào `selectedType.orderMax`
-- Load approvers từ API khi typeId thay đổi
-- Load saved approvers từ Redux state
+## Payload gửi HRM
 
-**Code reference**: `frontend/hooks/use-create-application-form.ts:201-258`
+Shape khác nhau theo loại đơn — HRM không thống nhất, ta phải chiều:
 
-### Time Selection
+```ts
+// Đơn xin nghỉ (typeId 1)
+{ dateStart, dateEnd, timeStart, timeEnd, reasonId }
 
-- Input `timeStart`: Thời gian bắt đầu (format: HH:mm)
-- Input `timeEnd`: Thời gian kết thúc (format: HH:mm)
-- Tự động tính toán dựa trên typeId và calendarDay
-
-**Code reference**: `frontend/hooks/use-create-application-form.ts:296-358`
-
-## Auto Time Calculation
-
-### Logic
-
-**Function**: `calculateAutoTime`
-
-**Code reference**: `frontend/hooks/use-create-application-form.ts:296-358`
-
-#### Đơn vắng mặt (typeId: 2)
-
-1. **Đi muộn**: `workStart` đến `min(timeIn, workStart + 60 phút)`
-2. **Về sớm**: `max(timeOut, workEnd - 60 phút)` đến `workEnd`
-3. **Thiếu chấm công**: Sử dụng `getMissingTimeRanges()`
-
-#### Đơn nghỉ phép (typeId: 1)
-
-1. **Có chấm công**: Sử dụng `getMissingTimeRanges()` (không thể làm đơn cả ngày)
-2. **Không có chấm công**: `workStart` đến `workEnd` (có thể làm đơn cả ngày)
-
-## Validation
-
-### Validation Function
-
-**Function**: `validate`
-
-**Code reference**: `frontend/hooks/use-create-application-form.ts:448-540`
-
-### Validation Rules
-
-#### 1. Date Range Validation
-
-- Chỉ cho phép tạo đơn trong vòng 7 ngày trở lại từ hôm nay
-- Không giới hạn tương lai
-
-```typescript
-const selectedDate = dayjs(date);
-const today = dayjs();
-const minDate = today.subtract(7, 'day');
-if (selectedDate.isBefore(minDate, 'day')) {
-  return false; // Warning message đã được xử lý bởi getWarningMessage
-}
+// Đơn vắng mặt và các loại khác
+{ date, timeStart, timeEnd, reasonId }
 ```
 
-**Code reference**: `frontend/hooks/use-create-application-form.ts:451-460`
+## Người duyệt
 
-#### 2. Approver Validation
+Số lượng lấy từ `type.orderMax`. Danh sách lấy từ `/application/approval-assignments`.
 
-- Tất cả người duyệt phải được chọn (theo `orderMax`)
+Lựa chọn được ghi nhớ qua `/application/approver-preferences` (lưu ở DB của hệ thống này, không phải HRM) và tự điền cho lần sau. Ghi nhớ hỏng thì bỏ qua — đó chỉ là tiện lợi, không đáng làm hỏng luồng tạo đơn.
 
-```typescript
-const approverCount = getApproverCount(selectedType);
-for (let order = 0; order < approverCount; order++) {
-  if (!approverIds[order]) {
-    setValidationError(`Vui lòng chọn người duyệt ${order + 1}`);
-    return false;
-  }
-}
-```
-
-**Code reference**: `frontend/hooks/use-create-application-form.ts:462-473`
-
-#### 3. Đơn nghỉ phép (typeId: 1)
-
-- Nếu có chấm công, không thể làm đơn cả ngày
-
-```typescript
-if (calendarDay && calendarDay.timeIn && calendarDay.timeOut) {
-  const isFullDay = !timeStart || !timeEnd || (timeStart === workStart && timeEnd === workEnd);
-  if (isFullDay) {
-    setValidationError('Không thể tạo đơn nghỉ phép cả ngày khi đã có chấm công...');
-    return false;
-  }
-}
-```
-
-**Code reference**: `frontend/hooks/use-create-application-form.ts:475-490`
-
-#### 4. Đơn vắng mặt (typeId: 2) - Thay đổi thời gian làm việc
-
-- **Điều kiện ngày:** Ngày đó phải làm đủ ít nhất 8 tiếng theo **thời gian hiệu quả** = (timeOut − timeIn) − **nghỉ trưa 1 giờ** − phút về sớm (nghỉ trưa không tính vào giờ làm)
-- Phải có `timeStart` và `timeEnd`
-- Mỗi đơn tối đa 60 phút (thay đổi giờ càng nhiều càng tốt)
-- Một tuần chỉ có tối đa 2 đơn vắng mặt loại này
-
-```typescript
-if (!timeStart || !timeEnd) {
-  setValidationError('Vui lòng nhập thời gian bắt đầu và kết thúc');
-  return false;
-}
-
-const calculatedMinutes = calculateMinutes(timeStart, timeEnd);
-if (calculatedMinutes > 60) {
-  setValidationError('Đơn Vắng mặt - Thay đổi thời gian làm việc không được quá 60 phút');
-  return false;
-}
-
-const hasAbsenceFormInWeek = checkAbsenceFormInWeek(date, calendarDays, dayDetailMap, mergedDays);
-if (hasAbsenceFormInWeek) {
-  setValidationError('Một tuần chỉ có thể có tối đa 2 đơn vắng mặt...');
-  return false;
-}
-```
-
-**Code reference**: `frontend/hooks/use-create-application-form.ts:492-537`
-
-## Warning Messages
-
-### getWarningMessage Function
-
-**Function**: `getWarningMessage`
-
-**Code reference**: `frontend/hooks/use-create-application-form.ts:376-410`
-
-### Warning Types
-
-#### 1. Overlap Warning (Ưu tiên cao nhất)
-
-- Kiểm tra overlap với các đơn đã có trong ngày
-- Message: "Ngày này đã có đơn trùng lặp thời gian. Vui lòng kiểm tra lại."
-
-```typescript
-if (timeStart && timeEnd) {
-  const hasOverlap = checkOverlappingForms(timeStart, timeEnd, calendarDay, dayDetail);
-  if (hasOverlap) {
-    return 'Ngày này đã có đơn trùng lặp thời gian. Vui lòng kiểm tra lại.';
-  }
-}
-```
-
-#### 2. Overdue Warning
-
-- Kiểm tra quá hạn làm đơn (7 ngày trở lại)
-- Message: "Đã quá hạn làm đơn cho ngày này"
-
-```typescript
-const selectedDate = dayjs(date);
-const today = dayjs();
-const minDate = today.subtract(7, 'day');
-if (selectedDate.isBefore(minDate, 'day')) {
-  return 'Đã quá hạn làm đơn cho ngày này';
-}
-```
-
-#### 3. Absence Form in Week Warning
-
-- Chỉ hiển thị khi typeId === 2
-- Message: "Đã có 2 đơn vắng mặt (Thay đổi thời gian làm việc) trong tuần này..."
-
-```typescript
-if (typeId === 2) {
-  const hasAbsenceFormInWeek = checkAbsenceFormInWeek(date, calendarDays, dayDetailMap, mergedDays);
-  if (hasAbsenceFormInWeek) {
-    return 'Đã có 2 đơn vắng mặt (Thay đổi thời gian làm việc) trong tuần này...';
-  }
-}
-```
-
-## Submit Flow
-
-### handleSubmit Function
-
-**Function**: `handleSubmit`
-
-**Returns**: `Promise<boolean>` - true nếu thành công, false nếu thất bại
-
-**Code reference**: `frontend/hooks/use-create-application-form.ts:543-611`
-
-### Steps
-
-1. **Validate**: Gọi `validate()`, return false nếu không hợp lệ
-2. **Check Token**: Kiểm tra HRM token
-3. **Create Payload**: Tạo payload với:
-   - `typeId`, `startDate`, `endDate`
-   - `data.trackingTimes` (khác nhau cho typeId 1 và 2)
-   - `applicationApprovals` (approvers)
-   - `description`
-4. **API Call**: Gọi `applicationApi.createApplicationForm()`
-5. **Return**: Return true nếu thành công, false nếu có lỗi
-
-### Payload Structure
-
-#### Đơn vắng mặt (typeId: 2)
-
-```typescript
-{
-  typeId: 2,
-  startDate: date,
-  endDate: date,
-  data: {
-    reasonId: reasonId,
-    trackingTimes: [{
-      date,
-      timeStart,
-      timeEnd,
-      reasonId: trackingTimeReasonId
-    }]
-  },
-  applicationApprovals: [...],
-  description: selectedType?.name || 'Đơn từ'
-}
-```
-
-#### Đơn nghỉ phép (typeId: 1)
-
-```typescript
-{
-  typeId: 1,
-  startDate: date,
-  endDate: date,
-  data: {
-    reasonId: reasonId,
-    trackingTimes: [{
-      dateStart: date,
-      dateEnd: date,
-      timeStart: timeStart || undefined,
-      timeEnd: timeEnd || undefined,
-      reasonId: trackingTimeReasonId
-    }]
-  },
-  applicationApprovals: [...],
-  description: selectedType?.name || 'Đơn từ'
-}
-```
-
-**Code reference**: `frontend/hooks/use-create-application-form.ts:570-601`
-
-## Success Handling
-
-### Dialog Component
-
-**File**: `frontend/components/timesheet/CreateApplicationFormDialog.tsx`
-
-```typescript
-const handleSubmit = async () => {
-  const success = await handleSubmitInternal();
-  if (success) {
-    toast.success('Tạo đơn từ thành công');
-    onSuccess();
-    onOpenChange(false);
-  }
-};
-```
-
-**Code reference**: `frontend/components/timesheet/CreateApplicationFormDialog.tsx:87-94`
-
-### onSuccess Callback
-
-- Gọi `onSuccess()` từ parent component
-- Parent reload calendar và tự động mở lại day detail
-
-**Code reference**: `frontend/components/timesheet/TimesheetDayDetail.tsx:67-72`
-
-## State Management
-
-### Form State
-
-- `typeId`: Loại đơn
-- `reasonId`: Lý do
-- `approverIds`: Mảng người duyệt (0-based index)
-- `timeStart`, `timeEnd`: Thời gian
-
-### Loading States
-
-- `loading`: Đang submit
-- `loadingTypes`: Đang load types
-- `loadingApprovers`: Đang load approvers
-
-### Error States
-
-- `error`: Lỗi từ API
-- `validationError`: Lỗi validation (blocking)
-- `warningMessage`: Cảnh báo (non-blocking)
-
-## API Integration
-
-### GET /application/types
-
-Load danh sách loại đơn.
-
-**Code reference**: `frontend/hooks/use-create-application-form.ts:102-125`
-
-### GET /application/reasons
-
-Load danh sách lý do (có thể filter theo typeId).
-
-**Code reference**: `frontend/hooks/use-create-application-form.ts:127-180`
-
-### GET /application/approval-assignments
-
-Load danh sách người duyệt cho typeId và order cụ thể.
-
-**Code reference**: `frontend/hooks/use-create-application-form.ts:201-258`
-
-### POST /application/forms
-
-Tạo đơn từ.
-
-**Code reference**: `frontend/hooks/use-create-application-form.ts:603`
-
-## Data Flow
-
-```
-User Input → Update State → Auto Calculate Time →
-Validate → Show Warnings/Errors → Submit →
-API Call → Success → Toast → onSuccess →
-Reload Calendar → Reopen Day Detail
-```
+Xem thêm: [06-approver-settings.md](./06-approver-settings.md)

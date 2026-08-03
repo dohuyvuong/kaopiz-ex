@@ -83,6 +83,27 @@ KaopizEX là hệ thống công cụ nội bộ của Kaopiz, được xây dự
 
 ## Cấu trúc thư mục
 
+### Shared (`@kaopiz/timesheet`)
+
+Logic nghiệp vụ chấm công, thuần TypeScript — không React, không NestJS, không gọi
+API. Frontend và backend cùng link vào (`link:../shared`) nên màn calendar và cron
+tự động tạo đơn không thể ra hai kết quả khác nhau.
+
+```
+shared/
+├── src/
+│   ├── types.ts          # CalendarDay, DayForm, TimesheetRules
+│   ├── normalize.ts      # response HRM → model (hấp thụ 3 shape trackingTimes)
+│   ├── estimate.ts       # ước tính muộn/sớm sau khi duyệt đơn chờ
+│   ├── rules.ts          # cảnh báo khi tạo đơn (tuần bắt đầu thứ Hai)
+│   ├── suggest.ts        # đề xuất đơn cần tạo
+│   ├── *.test.ts         # 52 test trên response thật của HRM
+│   └── __fixtures__/     # fixture rút từ fixtures/
+└── package.json
+```
+
+Chi tiết: [02-timesheet-calendar.md](./02-timesheet-calendar.md)
+
 ### Frontend
 
 ```
@@ -105,8 +126,7 @@ frontend/
 │   ├── use-create-application-form.ts
 │   ├── use-auto-create-applications.ts
 │   ├── use-approver-settings.ts
-│   ├── use-timesheet-calendar.ts
-│   └── use-timesheet-day-detail.ts
+│   └── use-timesheet-calendar.ts
 ├── lib/                          # Utilities và configurations
 │   ├── api/                      # API client + service functions
 │   │   ├── client.ts             # Axios client (auto token, refresh)
@@ -119,8 +139,6 @@ frontend/
 │   │   └── sidebar-store.ts
 │   ├── types/                    # TypeScript types
 │   └── utils/                    # Utility functions
-│       ├── application-form.ts
-│       └── auto-create-applications.ts
 └── package.json
 ```
 
@@ -147,6 +165,7 @@ backend/
 │   ├── timesheet/                # Timesheet module
 │   │   ├── timesheet.controller.ts
 │   │   ├── timesheet.service.ts
+│   │   ├── timesheet-snapshot.service.ts  # dựng dữ liệu cho @kaopiz/timesheet
 │   │   └── dto/
 │   ├── checklist/               # Checklist review module
 │   ├── common/                   # Common utilities

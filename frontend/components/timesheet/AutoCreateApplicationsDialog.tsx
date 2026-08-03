@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
-import dayjs from 'dayjs';
+import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
@@ -12,469 +11,237 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
-import {
-  Loader2,
-  AlertCircle,
-  CheckCircle2,
-  Edit2,
-  Trash2,
-  X,
-} from 'lucide-react';
-import { toast } from 'sonner';
+import { AlertTriangle, Loader2, Sparkles, Trash2 } from 'lucide-react';
 import { useAutoCreateApplications } from '@/hooks/use-auto-create-applications';
-import { ApplicationToCreate } from '@/lib/utils/auto-create-applications';
-import { TimesheetDay } from '@/lib/types/timesheet';
+import type { CalendarDay, LateEarly, TimesheetRules } from '@kaopiz/timesheet';
 
 interface AutoCreateApplicationsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  calendarDays: Array<{ date: Date; timesheet: TimesheetDay | null }>;
-  workingTime: { workStart: string; workEnd: string } | null;
+  days: CalendarDay[];
+  rules: TimesheetRules | null;
+  actualTotal: LateEarly | null;
   userId?: number;
-  mergedDays?: Map<string, TimesheetDay & { hasPendingForms?: boolean }>;
-  summary?: {
-    timelines: TimesheetDay[];
-    summary: { minutesLate: number; minutesEarly: number };
-  } | null;
-  onSuccess?: () => void;
+  today: string;
+  annualLeaveAvailable: number;
+  onCreated: () => void;
 }
 
 export function AutoCreateApplicationsDialog({
   open,
   onOpenChange,
-  calendarDays,
-  workingTime,
+  days,
+  rules,
+  actualTotal,
   userId,
-  mergedDays,
-  summary,
-  onSuccess,
+  today,
+  annualLeaveAvailable,
+  onCreated,
 }: AutoCreateApplicationsDialogProps) {
-  const {
-    applications,
-    loading,
-    error,
-    calculateApplications,
-    createApplications,
-    totalMinutesReduced,
-    updateApplication,
-    removeApplication,
-    progress,
-    previewAfterApprove,
-    missingApprovers,
-    createSummary,
-    resetCreateFeedback,
-  } = useAutoCreateApplications({
-    calendarDays,
-    workingTime,
+  const auto = useAutoCreateApplications({
+    open,
+    days,
+    rules,
+    actualTotal,
     userId,
-    mergedDays,
-    summary,
+    today,
+    annualLeaveAvailable,
   });
 
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [editForm, setEditForm] = useState<ApplicationToCreate | null>(null);
-  const prevOpenRef = useRef(open);
-
-  // Tự động tính toán khi mở dialog
-  useEffect(() => {
-    if (open && !prevOpenRef.current) {
-      // Dialog vừa mở (chuyển từ false sang true)
-      calculateApplications();
-    }
-    prevOpenRef.current = open;
-  }, [open, calculateApplications]);
-
-  // Reset edit state khi dialog mở
-  useEffect(() => {
-    if (open && !prevOpenRef.current) {
-      // Sử dụng setTimeout để tránh lỗi linter
-      setTimeout(() => {
-        setEditingIndex(null);
-        setEditForm(null);
-      }, 0);
-    }
-  }, [open]);
-
-  const handleDialogOpenChange = (nextOpen: boolean) => {
-    if (!nextOpen) {
-      resetCreateFeedback();
-      setEditingIndex(null);
-      setEditForm(null);
-    }
-    onOpenChange(nextOpen);
-  };
+  const { suggestion } = auto;
 
   const handleCreate = async () => {
-    const totalToCreate = applications.length;
-    const success = await createApplications();
-    if (success) {
-      toast.success(`Đã tạo thành công ${totalToCreate} đơn`);
-      onSuccess?.();
-      handleDialogOpenChange(false);
+    const allSucceeded = await auto.createAll();
+    if (allSucceeded) {
+      toast.success('Đã tạo xong các đơn');
+      onOpenChange(false);
+      onCreated();
+    } else {
+      toast.error('Một số đơn không tạo được, xem chi tiết trong danh sách');
+      onCreated();
     }
   };
-
-  const handleEdit = (index: number) => {
-    setEditingIndex(index);
-    setEditForm({ ...applications[index] });
-  };
-
-  const handleSaveEdit = () => {
-    if (editingIndex !== null && editForm) {
-      updateApplication(editingIndex, editForm);
-      setEditingIndex(null);
-      setEditForm(null);
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setEditingIndex(null);
-    setEditForm(null);
-  };
-
-  const handleDelete = (index: number) => {
-    if (confirm('Bạn có chắc muốn xóa đơn này?')) {
-      removeApplication(index);
-    }
-  };
-
-  const getTypeName = (typeId: number): string => {
-    return typeId === 1 ? 'Nghỉ phép' : 'Vắng mặt';
-  };
-
-  const getReasonName = (reasonId: number): string => {
-    return reasonId === 4 ? 'Nghỉ phép năm' : 'Thay đổi thời gian làm việc';
-  };
-
-  const calculateMinutes = (
-    timeStart: string,
-    timeEnd: string,
-  ): number | null => {
-    if (!timeStart || !timeEnd) return null;
-    try {
-      const start = dayjs(`2000-01-01 ${timeStart}`, 'YYYY-MM-DD HH:mm');
-      const end = dayjs(`2000-01-01 ${timeEnd}`, 'YYYY-MM-DD HH:mm');
-      if (!start.isValid() || !end.isValid()) return null;
-      const diff = end.diff(start, 'minute');
-      return diff > 0 ? diff : null;
-    } catch {
-      return null;
-    }
-  };
-
-  const totalViolationMinutes =
-    (summary?.summary.minutesLate || 0) + (summary?.summary.minutesEarly || 0);
 
   return (
-    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[calc(100vh-2rem)] overflow-hidden p-0 gap-0 flex flex-col">
-        <DialogHeader className="px-6 pt-6 pb-4 border-b">
-          <DialogTitle>Tự động tạo đơn</DialogTitle>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5" />
+            Tự động tạo đơn
+          </DialogTitle>
           <DialogDescription>
-            Hệ thống sẽ tự động tạo các đơn cần thiết cho phần vượt quá 90 phút
-            (miễn phạt). 90 phút đầu tiên không cần làm đơn vì không bị phạt.
+            Ưu tiên đơn vắng mặt (không tốn phép năm), chỉ dùng phép cho phần còn
+            lại. Chỉ tạo vừa đủ để về dưới hạn mức miễn phạt.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
-          {loading && applications.length === 0 ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              <span className="ml-2 text-sm text-muted-foreground">
-                Đang tính toán các đơn cần tạo...
-              </span>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {error && (
-                <div className="flex items-start gap-2 p-4 bg-destructive/10 border border-destructive/20 rounded-md">
-                  <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-destructive">{error}</p>
-                  </div>
-                </div>
-              )}
-              {createSummary && createSummary.created > 0 && createSummary.failed > 0 && (
-                <div className="flex items-start gap-2 p-4 bg-emerald-50 border border-emerald-200 rounded-md dark:bg-emerald-950/20 dark:border-emerald-800">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
-                      Đã tạo thành công {createSummary.created} đơn
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {applications.length === 0 ? (
-                <div className="flex items-center justify-center py-8">
-                  <CheckCircle2 className="h-6 w-6 text-green-600" />
-                  <span className="ml-2 text-sm text-muted-foreground">
-                    {totalViolationMinutes > 90
-                      ? 'Không có đơn cần tạo thêm trong phạm vi 7 ngày gần nhất.'
-                      : 'Không cần tạo đơn. Tổng đi muộn/về sớm đã ≤ 90 phút.'}
-                  </span>
+        <div className="space-y-4 overflow-y-auto flex-1 pr-1">
+          {suggestion && (
+            <div className="rounded-md border p-3 text-sm space-y-1">
+              <div>
+                Hiện tại:{' '}
+                <strong>{suggestion.currentTotal} phút</strong> / hạn mức{' '}
+                {suggestion.allowedTotal} phút
+              </div>
+              {suggestion.neededMinutes > 0 ? (
+                <div>
+                  Cần che thêm:{' '}
+                  <strong className="text-destructive">
+                    {suggestion.neededMinutes} phút
+                  </strong>
                 </div>
               ) : (
-                <>
-              {/* Cảnh báo thiếu người duyệt */}
-              {missingApprovers.length > 0 && (
-                <div className="flex items-start gap-2 p-4 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
-                  <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100 mb-2">
-                      Thiếu người duyệt cho các loại đơn sau:
-                    </p>
-                    <ul className="list-disc list-inside space-y-1 text-sm text-yellow-800 dark:text-yellow-200">
-                      {missingApprovers.map((missing) => (
-                        <li key={missing.typeId}>
-                          <strong>{missing.typeName}</strong>: Thiếu người duyệt bước{' '}
-                          {missing.missingOrders.join(', ')}
-                        </li>
-                      ))}
-                    </ul>
-                    <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-2">
-                      Vui lòng cấu hình người duyệt mặc định trước khi tạo đơn.
-                    </p>
-                  </div>
+                <div className="text-green-700">
+                  Chưa vượt hạn mức — không cần tạo đơn nào.
                 </div>
               )}
-
-              {/* Preview sau khi tất cả đơn được approve */}
-              <div className="p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-md">
-                <div className="text-sm font-semibold mb-2 text-blue-900 dark:text-blue-100">
-                  Preview sau khi tất cả đơn được approve:
+              {auto.annualLeaveMinutes > 0 && (
+                <div className="text-muted-foreground">
+                  Trong đó <strong>{auto.annualLeaveMinutes} phút</strong> dùng
+                  phép năm (~{auto.annualLeaveDays.toFixed(2)} ngày). Số dư:{' '}
+                  <strong>{auto.annualLeaveAvailable.toFixed(2)}</strong> →{' '}
+                  <strong
+                    className={
+                      auto.annualLeaveAfter < 0 ? 'text-destructive' : ''
+                    }
+                  >
+                    {auto.annualLeaveAfter.toFixed(2)}
+                  </strong>{' '}
+                  ngày.
                 </div>
-                <div className="grid grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <div className="text-muted-foreground">Đi muộn:</div>
-                    <div className="font-semibold text-blue-700 dark:text-blue-300">
-                      {previewAfterApprove.minutesLate} phút
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-muted-foreground">Về sớm:</div>
-                    <div className="font-semibold text-blue-700 dark:text-blue-300">
-                      {previewAfterApprove.minutesEarly} phút
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-muted-foreground">Tổng:</div>
-                    <div className="font-semibold text-blue-700 dark:text-blue-300">
-                      {previewAfterApprove.total} phút
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between p-3 bg-muted rounded-md">
-                <span className="text-sm font-medium">
-                  Tổng số đơn sẽ tạo:
-                </span>
-                <Badge variant="secondary">{applications.length} đơn</Badge>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-muted rounded-md">
-                <span className="text-sm font-medium">
-                  Tổng số phút sẽ giảm:
-                </span>
-                <Badge variant="secondary">{totalMinutesReduced} phút</Badge>
-              </div>
-
-              {/* Progress bar khi đang tạo */}
-              {loading && progress.total > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      Đang tạo đơn {progress.current}/{progress.total}
-                    </span>
-                    <span className="font-medium">
-                      {Math.round((progress.current / progress.total) * 100)}%
-                    </span>
-                  </div>
-                  <Progress
-                    value={progress.current}
-                    max={progress.total}
-                    className="h-2"
-                  />
-                  {progress.currentApp && (
-                    <div className="text-xs text-muted-foreground">
-                      Đang tạo: {dayjs(progress.currentApp.date).format('DD/MM/YYYY')} - {getTypeName(progress.currentApp.typeId)}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="max-h-[400px] overflow-y-auto">
-                <div className="space-y-3">
-                  {applications.map((app, index) => (
-                    <div
-                      key={index}
-                      className="p-4 border rounded-md space-y-2"
-                    >
-                      {editingIndex === index ? (
-                        // Edit mode
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium">
-                              Chỉnh sửa đơn
-                            </span>
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={handleSaveEdit}
-                              >
-                                Lưu
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={handleCancelEdit}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1">
-                              <Label className="text-xs">Thời gian bắt đầu</Label>
-                              <Input
-                                type="time"
-                                value={editForm?.timeStart || ''}
-                                onChange={(e) =>
-                                  setEditForm((prev) =>
-                                    prev
-                                      ? { ...prev, timeStart: e.target.value }
-                                      : null,
-                                  )
-                                }
-                                className="h-8"
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <Label className="text-xs">Thời gian kết thúc</Label>
-                              <Input
-                                type="time"
-                                value={editForm?.timeEnd || ''}
-                                onChange={(e) => {
-                                  const newTimeEnd = e.target.value;
-                                  setEditForm((prev) => {
-                                    if (!prev) return null;
-                                    const newMinutes =
-                                      calculateMinutes(
-                                        prev.timeStart,
-                                        newTimeEnd,
-                                      ) || 0;
-                                    return {
-                                      ...prev,
-                                      timeEnd: newTimeEnd,
-                                      minutes: newMinutes,
-                                    };
-                                  });
-                                }}
-                                className="h-8"
-                              />
-                            </div>
-                          </div>
-                          {editForm &&
-                            calculateMinutes(
-                              editForm.timeStart,
-                              editForm.timeEnd,
-                            ) !== null && (
-                              <div className="text-xs text-muted-foreground">
-                                Số phút: {calculateMinutes(editForm.timeStart, editForm.timeEnd)} phút
-                              </div>
-                            )}
-                        </div>
-                      ) : (
-                        // View mode
-                        <>
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <Badge
-                                variant={
-                                  app.typeId === 2 ? 'default' : 'secondary'
-                                }
-                              >
-                                {getTypeName(app.typeId)}
-                              </Badge>
-                              <span className="text-sm font-medium">
-                                {dayjs(app.date).format('DD/MM/YYYY')}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline">
-                                -{app.minutes} phút
-                              </Badge>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleEdit(index)}
-                                className="h-7 w-7 p-0"
-                              >
-                                <Edit2 className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleDelete(index)}
-                                className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          </div>
-                          <div className="text-sm text-muted-foreground space-y-1">
-                            <div>
-                              <span className="font-medium">Lý do:</span>{' '}
-                              {getReasonName(app.reasonId)}
-                            </div>
-                            <div>
-                              <span className="font-medium">Thời gian:</span>{' '}
-                              {app.timeStart} - {app.timeEnd}
-                            </div>
-                            <div>
-                              <span className="font-medium">Mô tả:</span>{' '}
-                              {app.description}
-                            </div>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-              </>
               )}
             </div>
           )}
-          </div>
 
-        <DialogFooter className="shrink-0 border-t px-6 py-4">
+          {suggestion && suggestion.uncoveredMinutes > 0 && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+              <div className="flex items-center gap-2 font-medium">
+                <AlertTriangle className="h-4 w-4" />
+                Còn {suggestion.uncoveredMinutes} phút không che được
+              </div>
+              <p className="text-xs mt-1">
+                Các ngày còn lại đã hết quota đơn vắng mặt trong tuần, không đủ giờ
+                làm, hoặc đã quá hạn nộp đơn.
+              </p>
+            </div>
+          )}
+
+          {auto.exceedsAnnualLeave && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+              <div className="flex items-center gap-2 font-medium">
+                <AlertTriangle className="h-4 w-4" />
+                Vượt quá số phép năm còn lại
+              </div>
+              <p className="text-xs mt-1">
+                Sau khi tạo, số phép năm sẽ là{' '}
+                {auto.annualLeaveAfter.toFixed(2)} ngày — phần âm là phép ứng
+                trước. Bạn có thể bỏ bớt các đơn nghỉ phép bên dưới và chấp nhận
+                bị phạt phần tương ứng.
+              </p>
+            </div>
+          )}
+
+          {auto.missingApprovers.length > 0 && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+              <div className="flex items-center gap-2 font-medium">
+                <AlertTriangle className="h-4 w-4" />
+                Chưa chọn người duyệt
+              </div>
+              <ul className="list-disc pl-5 mt-1">
+                {auto.missingApprovers.map((item) => (
+                  <li key={item.typeName}>
+                    {item.typeName}: thiếu người duyệt{' '}
+                    {item.orders.join(', ')}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {auto.forms.length > 0 && (
+            <div className="space-y-2">
+              {auto.forms.map((form) => {
+                const key = auto.formKey(form);
+                const failure = auto.failures.find(
+                  (item) => auto.formKey(item.form) === key,
+                );
+                return (
+                  <div
+                    key={key}
+                    className={
+                      failure
+                        ? 'rounded-md border border-destructive/40 bg-destructive/5 p-3 space-y-1'
+                        : 'rounded-md border p-3 space-y-1'
+                    }
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium">{form.date}</span>
+                        <Badge
+                          variant={form.usesAnnualLeave ? 'default' : 'secondary'}
+                        >
+                          {form.usesAnnualLeave ? 'Nghỉ phép năm' : 'Vắng mặt'}
+                        </Badge>
+                        <Badge variant="outline">
+                          {form.covers === 'late' ? 'Che đi muộn' : 'Che về sớm'}
+                        </Badge>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive"
+                        onClick={() => auto.removeForm(form)}
+                        disabled={auto.isCreating}
+                        aria-label="Bỏ đơn này"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {form.timeStart} – {form.timeEnd} ({form.minutes} phút)
+                    </div>
+                    {failure && (
+                      <div className="text-sm text-destructive">
+                        {failure.reason}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {auto.isCreating && auto.progress.total > 0 && (
+            <div className="space-y-2">
+              <Progress
+                value={(auto.progress.current / auto.progress.total) * 100}
+              />
+              <div className="text-sm text-muted-foreground text-center">
+                Đang tạo đơn {auto.progress.current}/{auto.progress.total}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
           <Button
             variant="outline"
-            onClick={() => handleDialogOpenChange(false)}
-            disabled={loading}
+            onClick={() => onOpenChange(false)}
+            disabled={auto.isCreating}
           >
-            Hủy
+            Đóng
           </Button>
-          {applications.length > 0 && (
-            <Button
-              onClick={handleCreate}
-              disabled={loading || editingIndex !== null || missingApprovers.length > 0}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Đang tạo đơn...
-                </>
-              ) : (
-                'Xác nhận và tạo đơn'
-              )}
-            </Button>
-          )}
+          <Button
+            onClick={() => void handleCreate()}
+            disabled={auto.isCreating || auto.forms.length === 0}
+          >
+            {auto.isCreating && (
+              <Loader2 className="h-4 w-4 animate-spin mr-1" />
+            )}
+            Tạo {auto.forms.length} đơn ({auto.totalMinutes} phút)
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

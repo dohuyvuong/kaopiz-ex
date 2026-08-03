@@ -23,6 +23,8 @@ import {
 } from './interfaces/pending-action-payload.interface';
 import { SubmitReviewPayloadDto } from '../checklist/dto/checklist-api.dto';
 import { CreateApplicationFormDto } from '../application/dto/create-application-form.dto';
+import { ApproverPreferenceService } from '../application/approver-preference.service';
+import { FormType } from '@kaopiz/timesheet';
 
 @Injectable()
 export class AutomationService {
@@ -34,6 +36,7 @@ export class AutomationService {
     private readonly checklistService: ChecklistService,
     @Inject(forwardRef(() => ApplicationService))
     private readonly applicationService: ApplicationService,
+    private readonly approverPreferenceService: ApproverPreferenceService,
     private readonly systemTokenService: SystemTokenService,
   ) {}
 
@@ -449,44 +452,107 @@ export class AutomationService {
   }
 
   /**
-   * Execute form creation (create application forms)
+   * Tạo các đơn đã được đề xuất.
+   *
+   * Người duyệt được tra tại ĐÂY chứ không lưu sẵn trong payload: khoảng cách
+   * giữa lúc gửi thông báo và lúc người dùng bấm duyệt có thể vài giờ, đủ để
+   * người dùng đổi lựa chọn người duyệt.
    */
   private async executeFormCreation(
     userId: number,
     payload: FormCreationPayload,
   ): Promise<void> {
     const { forms } = payload;
-    if (!forms || !Array.isArray(forms)) {
+    if (!forms || !Array.isArray(forms) || forms.length === 0) {
       throw new BadRequestException('Invalid payload for auto-create-forms');
     }
 
-    // Get user's HRM token
     const token = await this.systemTokenService.getToken(userId, 'hrm');
     if (!token) {
       throw new BadRequestException('HRM token not found for user');
     }
 
-    // Create each form
+    const [types, preferences] = await Promise.all([
+      this.applicationService.getFormTypes(token),
+      this.approverPreferenceService.getAll(userId),
+    ]);
+
+    const failures: string[] = [];
+
     for (const form of forms) {
       try {
+        const type = types.items?.find((item) => item.id === form.typeId);
+        const orderMax = type?.orderMax ?? 0;
+        const approvals = preferences
+          .filter(
+            (preference) =>
+              preference.typeId === form.typeId &&
+              preference.order <= orderMax &&
+              preference.approverUserId != null,
+          )
+          .map((preference) => ({
+            userId: preference.approverUserId,
+            order: preference.order,
+          }));
+
+        if (approvals.length < orderMax) {
+          throw new Error(
+            `chưa chọn đủ người duyệt cho "${type?.name ?? form.typeId}"`,
+          );
+        }
+
+        // Đơn xin nghỉ dùng dateStart/dateEnd, các loại khác dùng date — đúng
+        // shape HRM chờ đợi cho từng loại.
+        const trackingTime =
+          form.typeId === FormType.LEAVE
+            ? {
+                dateStart: form.date,
+                dateEnd: form.date,
+                timeStart: form.timeStart,
+                timeEnd: form.timeEnd,
+                reasonId: form.reasonId,
+              }
+            : {
+                date: form.date,
+                timeStart: form.timeStart,
+                timeEnd: form.timeEnd,
+                reasonId: form.reasonId,
+              };
+
         const formDto: CreateApplicationFormDto = {
           typeId: form.typeId,
-          startDate: form.startDate,
-          endDate: form.endDate,
-          data: form.data,
-          applicationApprovals: form.applicationApprovals,
+          startDate: form.date,
+          endDate: form.date,
+          data: { reasonId: form.reasonId, trackingTimes: [trackingTime] },
+          applicationApprovals: approvals,
+          description: form.description,
         };
+
         await this.applicationService.createApplicationForm(token, formDto);
         this.logger.log(
-          `Created application form for startDate ${form.startDate}, type ${form.typeId}`,
+          `Created ${form.typeId === FormType.LEAVE ? 'leave' : 'absence'} form for ${form.date} ` +
+            `(${form.timeStart}-${form.timeEnd}, ${form.minutes}m)`,
         );
       } catch (error) {
-        this.logger.error(
-          `Failed to create form for startDate ${form.startDate}:`,
-          error,
+        const reason = error instanceof Error ? error.message : String(error);
+        failures.push(
+          `${form.date} ${form.timeStart}-${form.timeEnd}: ${reason}`,
         );
-        // Continue with other forms even if one fails
+        this.logger.error(`Failed to create form for ${form.date}:`, error);
       }
+    }
+
+    // Tạo được đơn nào hay không vẫn phải báo lại: im lặng nuốt lỗi thì người
+    // dùng tưởng đã xong và cuối tháng mới phát hiện bị phạt.
+    if (failures.length === forms.length) {
+      throw new BadRequestException(
+        `Không tạo được đơn nào. ${failures.join('; ')}`,
+      );
+    }
+    if (failures.length > 0) {
+      this.logger.warn(
+        `Tạo được ${forms.length - failures.length}/${forms.length} đơn. Lỗi: ${failures.join('; ')}`,
+      );
     }
   }
 

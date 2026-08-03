@@ -1,0 +1,71 @@
+{
+  "success": true,
+  "data": {
+    "timeSheets": [
+      {
+        "id": 3008335,
+        "time": "2026-04-16T08:45:17.000Z",
+        "machineCode": "T4_aws_in"
+      },
+      {
+        "id": 3008323,
+        "time": "2026-04-16T08:45:33.000Z",
+        "machineCode": "T4_aws_out"
+      },
+      {
+        "id": 3010619,
+        "time": "2026-04-16T12:10:23.000Z",
+        "machineCode": "T4_aws_in"
+      },
+      {
+        "id": 3010694,
+        "time": "2026-04-16T13:50:08.000Z",
+        "machineCode": "T4_aws_out"
+      }
+    ],
+    "applicationForms": [
+      {
+        "id": 102878,
+        "typeId": 4,
+        "projectId": null,
+        "startDate": "2026-04-16T00:00:00.000Z",
+        "endDate": "2026-04-16T00:00:00.000Z",
+        "status": 3,
+        "data": {
+          "trackingTimes": [
+            {
+              "date": "2026-04-16",
+              "reasonId": 25
+            }
+          ]
+        },
+        "type": {
+          "id": 4,
+          "name": "Đơn checkin/out"
+        }
+      },
+      {
+        "id": 102880,
+        "typeId": 2,
+        "projectId": null,
+        "startDate": "2026-04-16T00:00:00.000Z",
+        "endDate": "2026-04-16T00:00:00.000Z",
+        "status": 3,
+        "data": {
+          "trackingTimes": [
+            {
+              "date": "2026-04-16",
+              "timeStart": "08:30",
+              "timeEnd": "08:45",
+              "reasonId": 21
+            }
+          ]
+        },
+        "type": {
+          "id": 2,
+          "name": "Đơn vắng mặt"
+        }
+      }
+    ]
+  }
+}

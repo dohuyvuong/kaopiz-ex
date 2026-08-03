@@ -43,3 +43,9 @@ lerna-debug.log*
 
 # Build
 *.tsbuildinfo
+
+# SQLite dev database — dữ liệu cục bộ, không commit
+*.db
+*.db-journal
+prisma/*.db
+prisma/*.db-journal

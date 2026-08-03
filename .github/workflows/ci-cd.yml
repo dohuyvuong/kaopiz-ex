@@ -1,4 +1,4 @@
-# CI: ESLint (backend + frontend) trên PR/push → master
+# CI: lint + test (shared, backend, frontend) trên PR/push → master
 # CD: push master → build 3 image (trùng tag với .env trên VPS), scp tarball, docker load, docker compose up -d
 #
 # Cần cấu hình trên GitHub → Settings → Secrets and variables → Actions
@@ -34,7 +34,7 @@ concurrency:
 
 jobs:
   lint:
-    name: Lint
+    name: Lint & test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -45,20 +45,32 @@ jobs:
           node-version: '24'
           cache: yarn
           cache-dependency-path: |
+            shared/yarn.lock
             backend/yarn.lock
             frontend/yarn.lock
 
-      - name: Backend — install & lint
+      # Phải build shared TRƯỚC: backend và frontend link vào nó qua
+      # `link:../shared` và đọc type từ `shared/dist`.
+      - name: Shared — install, test & build
+        working-directory: shared
+        run: |
+          yarn install --frozen-lockfile
+          yarn test
+          yarn build
+
+      - name: Backend — install, lint & test
         working-directory: backend
         run: |
           yarn install --frozen-lockfile
           yarn lint
+          yarn test
 
-      - name: Frontend — install & lint
+      - name: Frontend — install, lint & typecheck
         working-directory: frontend
         run: |
           yarn install --frozen-lockfile
           yarn lint
+          yarn tsc --noEmit
 
   deploy:
     name: Build & deploy to VPS
@@ -99,7 +111,7 @@ jobs:
       - name: Build backend image
         uses: docker/build-push-action@v6
         with:
-          context: ./backend
+          context: .
           file: ./backend/Dockerfile
           platforms: ${{ env.IMAGE_PLATFORM }}
           tags: ${{ env.BACKEND_IMAGE }}
@@ -111,7 +123,7 @@ jobs:
       - name: Build frontend image
         uses: docker/build-push-action@v6
         with:
-          context: ./frontend
+          context: .
           file: ./frontend/Dockerfile
           platforms: ${{ env.IMAGE_PLATFORM }}
           build-args: |

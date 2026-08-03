@@ -14,15 +14,18 @@ COMPOSE_PROD := docker compose --profile db --profile app --profile edge
 
 .PHONY: build-backend build-frontend build-nginx build up-db up-app up up-prod down logs
 
+# Context là gốc repo (dấu "."), không phải ./backend hay ./frontend: cả hai
+# image đều cần thư mục shared/ — package logic chấm công dùng chung.
 build-backend: guard-BACKEND_IMAGE guard-IMAGE_PLATFORM
-	docker build --platform=$(IMAGE_PLATFORM) -t $(BACKEND_IMAGE) ./backend
+	docker build --platform=$(IMAGE_PLATFORM) -f backend/Dockerfile -t $(BACKEND_IMAGE) .
 
 build-frontend: guard-FRONTEND_IMAGE guard-IMAGE_PLATFORM guard-NEXT_PUBLIC_API_BASE_URL
 	docker build \
 		--platform=$(IMAGE_PLATFORM) \
 		--build-arg NEXT_PUBLIC_API_BASE_URL=$(NEXT_PUBLIC_API_BASE_URL) \
+		-f frontend/Dockerfile \
 		-t $(FRONTEND_IMAGE) \
-		./frontend
+		.
 
 build-nginx: guard-NGINX_IMAGE
 	docker build --platform=$(IMAGE_PLATFORM) -t $(NGINX_IMAGE) ./nginx

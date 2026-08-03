@@ -1,0 +1,43 @@
+Description: API get all application types.
+
+API: GET https://api.hrm.kaopiz.com/api/master/all-types
+
+Payload:
+
+Response:
+```
+{
+    "items": [
+        {
+            "id": 1,
+            "name": "Đơn xin nghỉ",
+            "order_max": 2
+        },
+        {
+            "id": 2,
+            "name": "Đơn vắng mặt",
+            "order_max": 1
+        },
+        {
+            "id": 3,
+            "name": "Đơn làm thêm",
+            "order_max": 1
+        },
+        {
+            "id": 4,
+            "name": "Đơn checkin/out",
+            "order_max": 2
+        },
+        {
+            "id": 5,
+            "name": "Đơn làm theo chế độ",
+            "order_max": 2
+        },
+        {
+            "id": 6,
+            "name": "Đơn đổi ca",
+            "order_max": 2
+        }
+    ]
+}
+```

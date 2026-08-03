@@ -1,0 +1,83 @@
+{
+  "timeSheets": [
+    {
+      "id": 3440873,
+      "time": "2026-07-31 09:05:12",
+      "machine_code": "M8"
+    },
+    {
+      "id": 3439889,
+      "time": "2026-07-31 09:07:15",
+      "machine_code": "FACE08"
+    },
+    {
+      "id": 3439890,
+      "time": "2026-07-31 09:07:18",
+      "machine_code": "FACE08"
+    },
+    {
+      "id": 3442450,
+      "time": "2026-07-31 15:55:34",
+      "machine_code": "T4_aws_out"
+    },
+    {
+      "id": 3442436,
+      "time": "2026-07-31 15:55:58",
+      "machine_code": "T4_aws_in"
+    }
+  ],
+  "application_forms": [
+    {
+      "id": 119164,
+      "type_id": 1,
+      "project_id": null,
+      "start_date": "2026-07-31 00:00:00",
+      "end_date": "2026-07-31 00:00:00",
+      "status": 3,
+      "data": {
+        "reason_id": 4,
+        "tracking_times": [
+          {
+            "date_end": "2026-07-31",
+            "time_end": "17:30",
+            "count_hour": 1.583333333333334,
+            "date_start": "2026-07-31",
+            "time_start": "15:55"
+          }
+        ],
+        "annual_leave_used": {
+          "last_year": 0,
+          "this_year": 0.1979
+        }
+      },
+      "type": {
+        "id": 1,
+        "name": "Đơn xin nghỉ"
+      }
+    },
+    {
+      "id": 119275,
+      "type_id": 1,
+      "project_id": null,
+      "start_date": "2026-07-31 00:00:00",
+      "end_date": "2026-07-31 00:00:00",
+      "status": 1,
+      "data": {
+        "reason_id": 4,
+        "tracking_times": [
+          {
+            "date_end": "2026-07-31",
+            "time_end": "08:55",
+            "count_hour": 0.4166666666666661,
+            "date_start": "2026-07-31",
+            "time_start": "08:30"
+          }
+        ]
+      },
+      "type": {
+        "id": 1,
+        "name": "Đơn xin nghỉ"
+      }
+    }
+  ]
+}

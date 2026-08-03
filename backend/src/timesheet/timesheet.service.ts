@@ -32,18 +32,46 @@ export class TimesheetService {
     );
 
     // Transform từ snake_case sang camelCase
-    const transformedData = plainToInstance(
+    return plainToInstance(
       TimesheetCalendarResponseDto,
-      rawData,
+      {
+        ...(rawData as Record<string, unknown>),
+        application_form_config: this.extractApplicationFormConfig(rawData),
+      },
       {
         excludeExtraneousValues: true,
       },
     );
+  }
 
-    // Có thể thêm custom logic ở đây sau này
-    // Ví dụ: tính toán tổng vi phạm, đề xuất đơn, v.v.
+  /**
+   * Rút cấu hình hạn nộp đơn ra khỏi chỗ HRM chôn nó.
+   *
+   * HRM lặp lại nguyên object `user` — kèm `application_form_config` — trong MỌI
+   * đơn đã duyệt của mọi ngày. Ta bỏ `user` khỏi response (nặng và thừa) nên phải
+   * nhặt cấu hình ra trước, nâng lên cấp response để client dùng trực tiếp.
+   *
+   * Trả `null` nếu tháng đó không có đơn nào đã duyệt — khi đó client tự dùng
+   * mặc định. Chấp nhận được vì hạn nộp chỉ dùng để CẢNH BÁO, không chặn.
+   */
+  private extractApplicationFormConfig(rawData: unknown): unknown {
+    const timelines = (rawData as { timelines?: unknown })?.timelines;
+    if (!Array.isArray(timelines)) return null;
 
-    return transformedData;
+    for (const day of timelines) {
+      const forms = (day as { approved_application_forms?: unknown })
+        ?.approved_application_forms;
+      if (!Array.isArray(forms)) continue;
+
+      for (const form of forms) {
+        const config = (
+          form as { user?: { application_form_config?: unknown } }
+        )?.user?.application_form_config;
+        if (config) return config;
+      }
+    }
+
+    return null;
   }
 
   /**

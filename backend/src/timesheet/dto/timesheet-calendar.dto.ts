@@ -1,4 +1,8 @@
 import { Expose, Transform, Type } from 'class-transformer';
+import {
+  ApplicationFormConfigDto,
+  ApplicationFormDataDto,
+} from './application-form.dto';
 
 /**
  * DTO cho WorkingTime từ HRM API
@@ -63,63 +67,11 @@ export class WorkingTimeDto {
 }
 
 /**
- * DTO cho TrackingTime trong ApplicationForm
- */
-export class TrackingTimeDto {
-  @Expose()
-  date?: string;
-
-  @Expose({ name: 'date_start' })
-  dateStart?: string;
-
-  @Expose({ name: 'date_end' })
-  dateEnd?: string;
-
-  @Expose({ name: 'time_start' })
-  timeStart?: string;
-
-  @Expose({ name: 'time_end' })
-  timeEnd?: string;
-
-  @Expose({ name: 'time_off' })
-  timeOff?: string | null;
-
-  @Expose({ name: 'count_hour' })
-  countHour?: number;
-
-  @Expose()
-  reason?: string;
-
-  @Expose({ name: 'reason_id' })
-  reasonId?: number;
-
-  @Expose({ name: 'is_calculate_salary' })
-  isCalculateSalary?: number;
-}
-
-/**
- * DTO cho ApplicationForm data
- */
-export class ApplicationFormDataDto {
-  @Expose({ name: 'reason_id' })
-  reasonId?: number;
-
-  @Expose({ name: 'tracking_times' })
-  @Type(() => TrackingTimeDto)
-  trackingTimes?: TrackingTimeDto[];
-
-  @Expose({ name: 'annual_leave_used' })
-  annualLeaveUsed?: {
-    lastYear: number;
-    thisYear: number;
-  };
-
-  @Expose()
-  time?: string;
-}
-
-/**
- * DTO cho ApplicationForm
+ * DTO cho ApplicationForm.
+ *
+ * Không expose `user`: HRM nhồi nguyên object user (kèm cấu hình, phòng ban,
+ * email) vào MỖI đơn — nặng và thừa. Phần duy nhất cần dùng là
+ * `application_form_config`, đã được nâng lên cấp response.
  */
 export class ApplicationFormDto {
   @Expose()
@@ -146,9 +98,6 @@ export class ApplicationFormDto {
   @Expose({ name: 'created_at' })
   @Transform(({ value }) => (value ? new Date(value) : null))
   createdAt: Date | null;
-
-  @Expose()
-  user?: unknown;
 }
 
 /**
@@ -418,4 +367,13 @@ export class TimesheetCalendarResponseDto {
   @Expose()
   @Type(() => TimesheetTotalDto)
   total: TimesheetTotalDto;
+
+  /**
+   * Hạn nộp đơn theo loại. HRM chôn cấu hình này trong `user` của từng đơn đã
+   * duyệt; service nâng lên đây để client không phải đào, và để nó vẫn còn khi
+   * đơn bị lược bỏ. Vắng nếu tháng đó không có đơn nào đã duyệt.
+   */
+  @Expose({ name: 'application_form_config' })
+  @Type(() => ApplicationFormConfigDto)
+  applicationFormConfig: ApplicationFormConfigDto | null;
 }

@@ -99,6 +99,20 @@ export interface AbsenceInfo {
   absenceCompensatoryLeave: number;
 }
 
+/** Hạn nộp đơn theo loại — HRM cấu hình theo từng user. */
+export interface ApplicationFormTypeConfig {
+  typeId: number;
+  /** Số ngày còn được nộp đơn tính từ ngày áp dụng. */
+  maxDaysAfter: number;
+  /** 0 = không giới hạn ngày tương lai. */
+  maxDaysBefore: number;
+  maxApplicationFormInMonth?: number;
+}
+
+export interface ApplicationFormConfig {
+  types: ApplicationFormTypeConfig[];
+}
+
 export interface TimesheetCalendarResponse {
   userId: number;
   userCode: string;
@@ -118,4 +132,9 @@ export interface TimesheetCalendarResponse {
   workingEndDate: string | null; // ISO date string (ví dụ: "2025-10-16T00:00:00.000Z")
   summary: TimesheetSummary;
   total: TimesheetTotal;
+  /**
+   * Backend nâng lên từ `user.application_form_config` của đơn đã duyệt.
+   * Vắng nếu tháng đó không có đơn nào đã duyệt.
+   */
+  applicationFormConfig: ApplicationFormConfig | null;
 }

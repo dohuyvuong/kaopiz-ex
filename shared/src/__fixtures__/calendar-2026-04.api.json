@@ -1,0 +1,1603 @@
+{
+  "success": true,
+  "data": {
+    "userId": 861,
+    "userCode": "KP.00442",
+    "userFullName": "Đỗ Huy Vượng",
+    "userFullNameKatakana": "Đỗ Huy Vượng",
+    "userEmail": "vuongdh@kaopiz.com",
+    "departmentId": 7,
+    "contractDepartmentId": 2,
+    "seniorManagements": null,
+    "workingTime": {
+      "id": 2,
+      "name": "Kaopiz Việt Nam",
+      "workStart": "08:30",
+      "workEnd": "17:30",
+      "lunchStart": "12:00",
+      "lunchEnd": "13:00",
+      "dinnerStart": "17:30",
+      "dinnerEnd": "18:00",
+      "workingHoursPerDay": 8,
+      "workingHoursPerShift": 8,
+      "minutesEarlyLateAllowed": 90,
+      "timezone": "VN",
+      "createdAt": "2024-08-06T04:18:55.000Z",
+      "updatedAt": "2024-08-06T04:18:55.000Z",
+      "lunchBreakTime": 60,
+      "dinnerBreakTime": 30,
+      "dayOfWeek": 0,
+      "timezoneValue": "Asia/Ho_Chi_Minh"
+    },
+    "timelines": [
+      {
+        "date": "2026-04-01T00:00:00.000Z",
+        "timeIn": "08:50",
+        "timeOut": "19:27",
+        "symbol": null,
+        "location": "",
+        "timeInFinal": "08:50",
+        "timeOutFinal": "19:27",
+        "work": "1",
+        "workDays": 1,
+        "workHours": 7.6667,
+        "workStart": "08:50",
+        "workEnd": "17:30",
+        "minutesLate": 20,
+        "minutesEarly": 0,
+        "approvedApplicationForms": [],
+        "logWork": {
+          "id": 17238512,
+          "userId": 861,
+          "timeSpent": 28800,
+          "date": "2026-04-01T00:00:00.000Z",
+          "timeSpentHour": 8
+        },
+        "logWorkDiff": 0,
+        "logWorkNeeded": 8
+      },
+      {
+        "date": "2026-04-02T00:00:00.000Z",
+        "timeIn": "09:26",
+        "timeOut": "18:37",
+        "symbol": "V",
+        "location": "",
+        "timeInFinal": "08:30",
+        "timeOutFinal": "18:37",
+        "work": "1",
+        "workDays": 1,
+        "workHours": 8,
+        "workStart": "08:30",
+        "workEnd": "17:30",
+        "minutesLate": 0,
+        "minutesEarly": 0,
+        "approvedApplicationForms": [
+          {
+            "id": 100261,
+            "userId": 861,
+            "typeId": 2,
+            "startDate": "2026-04-02T00:00:00.000Z",
+            "endDate": "2026-04-02T00:00:00.000Z",
+            "data": {
+              "reasonId": 21,
+              "trackingTimes": [
+                {
+                  "date": "2026-04-02",
+                  "timeStart": "08:30",
+                  "timeEnd": "09:26",
+                  "reasonId": 21
+                }
+              ]
+            },
+            "createdAt": "2026-04-05T15:42:34.000Z"
+          }
+        ],
+        "logWork": {
+          "id": 17238519,
+          "userId": 861,
+          "timeSpent": 28800,
+          "date": "2026-04-02T00:00:00.000Z",
+          "timeSpentHour": 8
+        },
+        "logWorkDiff": 0,
+        "logWorkNeeded": 8
+      },
+      {
+        "date": "2026-04-03T00:00:00.000Z",
+        "timeIn": null,
+        "timeOut": null,
+        "symbol": "P",
+        "location": "",
+        "timeInFinal": "08:30",
+        "timeOutFinal": "17:30",
+        "work": "1",
+        "workDays": 1,
+        "workHours": 8,
+        "workStart": "08:30",
+        "workEnd": "17:30",
+        "minutesLate": 0,
+        "minutesEarly": 0,
+        "approvedApplicationForms": [
+          {
+            "id": 100919,
+            "userId": 861,
+            "typeId": 1,
+            "startDate": "2026-04-03T00:00:00.000Z",
+            "endDate": "2026-04-03T00:00:00.000Z",
+            "data": {
+              "reasonId": 4,
+              "trackingTimes": [
+                {
+                  "dateStart": "2026-04-03",
+                  "dateEnd": "2026-04-03",
+                  "timeStart": "08:30",
+                  "timeEnd": "17:30",
+                  "countHour": 8,
+                  "reasonId": 4
+                }
+              ],
+              "annualLeaveUsed": {
+                "last_year": 0,
+                "this_year": 1
+              }
+            },
+            "createdAt": "2026-04-09T07:13:37.000Z",
+            "user": {
+              "id": 861,
+              "name": "Đỗ Huy Vượng",
+              "katakana_name": null,
+              "code": "KP.00442",
+              "email": "vuongdh@kaopiz.com",
+              "status": 1,
+              "timesheet_code": 73,
+              "jira_user_key": "JIRAUSER12511",
+              "department_id": 7,
+              "contract_department_id": 2,
+              "ksystem_roles": "LTV",
+              "application_form_config": {
+                "types": [
+                  {
+                    "type_id": 1,
+                    "max_days_after": 6,
+                    "max_days_before": 0
+                  },
+                  {
+                    "type_id": 2,
+                    "max_days_after": 6,
+                    "max_days_before": 0
+                  },
+                  {
+                    "type_id": 3,
+                    "max_days_after": 6,
+                    "max_days_before": 0
+                  },
+                  {
+                    "type_id": 4,
+                    "max_days_after": 6,
+                    "max_days_before": 0
+                  },
+                  {
+                    "type_id": 5,
+                    "max_days_after": 6,
+                    "max_days_before": 0
+                  },
+                  {
+                    "type_id": 6,
+                    "max_days_after": 6,
+                    "max_days_before": 0,
+                    "max_application_form_in_month": 40
+                  }
+                ]
+              },
+              "annual_leave_config": {
+                "allow_advance": 6
+              },
+              "email_verified_at": null,
+              "created_at": "2023-01-11T19:41:00.000000Z",
+              "updated_at": "2026-08-03T01:44:56.000000Z",
+              "deleted_at": null,
+              "deactive_at": null,
+              "working_start_date": "2022-05-30",
+              "official_start_date": "2022-07-30",
+              "working_end_date": null,
+              "work_time_id": null,
+              "user_working_time": null,
+              "work_time_contract_department": {
+                "work_time_id": 2,
+                "contract_department_id": 2,
+                "work_time": {
+                  "id": 2,
+                  "name": "Kaopiz Việt Nam",
+                  "work_start": "08:30",
+                  "work_end": "17:30",
+                  "lunch_start": "12:00",
+                  "lunch_end": "13:00",
+                  "dinner_start": "17:30",
+                  "dinner_end": "18:00",
+                  "working_hours_per_day": 8,
+                  "working_hours_per_shift": 8,
+                  "minutes_early_late_allowed": 90,
+                  "timezone": "VN",
+                  "created_at": "2024-08-06T04:18:55.000000Z",
+                  "updated_at": "2024-08-06T04:18:55.000000Z"
+                }
+              }
+            }
+          }
+        ],
+        "logWork": null,
+        "logWorkDiff": 0,
+        "logWorkNeeded": 0
+      },
+      {
+        "date": "2026-04-04T00:00:00.000Z",
+        "timeIn": null,
+        "timeOut": null,
+        "symbol": null,
+        "location": "",
+        "timeInFinal": null,
+        "timeOutFinal": null,
+        "work": "N",
+        "workDays": 0,
+        "workHours": 0,
+        "workStart": null,
+        "workEnd": null,
+        "minutesLate": 0,
+        "minutesEarly": 0,
+        "approvedApplicationForms": [],
+        "logWork": null,
+        "logWorkDiff": 0,
+        "logWorkNeeded": 0
+      },
+      {
+        "date": "2026-04-05T00:00:00.000Z",
+        "timeIn": null,
+        "timeOut": null,
+        "symbol": null,
+        "location": "",
+        "timeInFinal": null,
+        "timeOutFinal": null,
+        "work": "N",
+        "workDays": 0,
+        "workHours": 0,
+        "workStart": null,
+        "workEnd": null,
+        "minutesLate": 0,
+        "minutesEarly": 0,
+        "approvedApplicationForms": [],
+        "logWork": null,
+        "logWorkDiff": 0,
+        "logWorkNeeded": 0
+      },
+      {
+        "date": "2026-04-06T00:00:00.000Z",
+        "timeIn": "08:44",
+        "timeOut": "18:41",
+        "symbol": null,
+        "location": "",
+        "timeInFinal": "08:44",
+        "timeOutFinal": "18:41",
+        "work": "1",
+        "workDays": 1,
+        "workHours": 7.7667,
+        "workStart": "08:44",
+        "workEnd": "17:30",
+        "minutesLate": 14,
+        "minutesEarly": 0,
+        "approvedApplicationForms": [],
+        "logWork": {
+          "id": 17238534,
+          "userId": 861,
+          "timeSpent": 28800,
+          "date": "2026-04-06T00:00:00.000Z",
+          "timeSpentHour": 8
+        },
+        "logWorkDiff": 0,
+        "logWorkNeeded": 8
+      },
+      {
+        "date": "2026-04-07T00:00:00.000Z",
+        "timeIn": "08:50",
+        "timeOut": "18:35",
+        "symbol": "V",
+        "location": "",
+        "timeInFinal": "08:30",
+        "timeOutFinal": "18:35",
+        "work": "1",
+        "workDays": 1,
+        "workHours": 8,
+        "workStart": "08:30",
+        "workEnd": "17:30",
+        "minutesLate": 0,
+        "minutesEarly": 0,
+        "approvedApplicationForms": [
+          {
+            "id": 101059,
+            "userId": 861,
+            "typeId": 2,
+            "startDate": "2026-04-07T00:00:00.000Z",
+            "endDate": "2026-04-07T00:00:00.000Z",
+            "data": {
+              "reasonId": 21,
+              "trackingTimes": [
+                {
+                  "date": "2026-04-07",
+                  "timeStart": "08:30",
+                  "timeEnd": "08:50",
+                  "reasonId": 21
+                }
+              ]
+            },
+            "createdAt": "2026-04-10T02:48:58.000Z"
+          }
+        ],
+        "logWork": {
+          "id": 17238542,
+          "userId": 861,
+          "timeSpent": 28800,
+          "date": "2026-04-07T00:00:00.000Z",
+          "timeSpentHour": 8
+        },
+        "logWorkDiff": 0,
+        "logWorkNeeded": 8
+      },
+      {
+        "date": "2026-04-08T00:00:00.000Z",
+        "timeIn": "08:44",
+        "timeOut": "18:22",
+        "symbol": "V",
+        "location": "",
+        "timeInFinal": "08:30",
+        "timeOutFinal": "18:22",
+        "work": "1",
+        "workDays": 1,
+        "workHours": 8,
+        "workStart": "08:30",
+        "workEnd": "17:30",
+        "minutesLate": 0,
+        "minutesEarly": 0,
+        "approvedApplicationForms": [
+          {
+            "id": 101060,
+            "userId": 861,
+            "typeId": 2,
+            "startDate": "2026-04-08T00:00:00.000Z",
+            "endDate": "2026-04-08T00:00:00.000Z",
+            "data": {
+              "reasonId": 21,
+              "trackingTimes": [
+                {
+                  "date": "2026-04-08",
+                  "timeStart": "08:30",
+                  "timeEnd": "08:44",
+                  "reasonId": 21
+                }
+              ]
+            },
+            "createdAt": "2026-04-10T02:48:59.000Z"
+          }
+        ],
+        "logWork": {
+          "id": 17238550,
+          "userId": 861,
+          "timeSpent": 28800,
+          "date": "2026-04-08T00:00:00.000Z",
+          "timeSpentHour": 8
+        },
+        "logWorkDiff": 0,
+        "logWorkNeeded": 8
+      },
+      {
+        "date": "2026-04-09T00:00:00.000Z",
+        "timeIn": "08:42",
+        "timeOut": "19:27",
+        "symbol": null,
+        "location": "",
+        "timeInFinal": "08:42",
+        "timeOutFinal": "19:27",
+        "work": "1",
+        "workDays": 1,
+        "workHours": 7.8,
+        "workStart": "08:42",
+        "workEnd": "17:30",
+        "minutesLate": 12,
+        "minutesEarly": 0,
+        "approvedApplicationForms": [],
+        "logWork": {
+          "id": 17238558,
+          "userId": 861,
+          "timeSpent": 28800,
+          "date": "2026-04-09T00:00:00.000Z",
+          "timeSpentHour": 8
+        },
+        "logWorkDiff": 0,
+        "logWorkNeeded": 8
+      },
+      {
+        "date": "2026-04-10T00:00:00.000Z",
+        "timeIn": "08:33",
+        "timeOut": "21:24",
+        "symbol": null,
+        "location": "",
+        "timeInFinal": "08:33",
+        "timeOutFinal": "21:24",
+        "work": "1",
+        "workDays": 1,
+        "workHours": 7.95,
+        "workStart": "08:33",
+        "workEnd": "17:30",
+        "minutesLate": 3,
+        "minutesEarly": 0,
+        "approvedApplicationForms": [],
+        "logWork": {
+          "id": 17238565,
+          "userId": 861,
+          "timeSpent": 28800,
+          "date": "2026-04-10T00:00:00.000Z",
+          "timeSpentHour": 8
+        },
+        "logWorkDiff": 0,
+        "logWorkNeeded": 8
+      },
+      {
+        "date": "2026-04-11T00:00:00.000Z",
+        "timeIn": null,
+        "timeOut": null,
+        "symbol": null,
+        "location": "",
+        "timeInFinal": null,
+        "timeOutFinal": null,
+        "work": "N",
+        "workDays": 0,
+        "workHours": 0,
+        "workStart": null,
+        "workEnd": null,
+        "minutesLate": 0,
+        "minutesEarly": 0,
+        "approvedApplicationForms": [],
+        "logWork": null,
+        "logWorkDiff": 0,
+        "logWorkNeeded": 0
+      },
+      {
+        "date": "2026-04-12T00:00:00.000Z",
+        "timeIn": null,
+        "timeOut": null,
+        "symbol": null,
+        "location": "",
+        "timeInFinal": null,
+        "timeOutFinal": null,
+        "work": "N",
+        "workDays": 0,
+        "workHours": 0,
+        "workStart": null,
+        "workEnd": null,
+        "minutesLate": 0,
+        "minutesEarly": 0,
+        "approvedApplicationForms": [],
+        "logWork": null,
+        "logWorkDiff": 0,
+        "logWorkNeeded": 0
+      },
+      {
+        "date": "2026-04-13T00:00:00.000Z",
+        "timeIn": "08:38",
+        "timeOut": "17:40",
+        "symbol": null,
+        "location": "",
+        "timeInFinal": "08:38",
+        "timeOutFinal": "17:40",
+        "work": "1",
+        "workDays": 1,
+        "workHours": 7.8667,
+        "workStart": "08:38",
+        "workEnd": "17:30",
+        "minutesLate": 8,
+        "minutesEarly": 0,
+        "approvedApplicationForms": [],
+        "logWork": {
+          "id": 17238573,
+          "userId": 861,
+          "timeSpent": 28800,
+          "date": "2026-04-13T00:00:00.000Z",
+          "timeSpentHour": 8
+        },
+        "logWorkDiff": 0,
+        "logWorkNeeded": 8
+      },
+      {
+        "date": "2026-04-14T00:00:00.000Z",
+        "timeIn": "08:52",
+        "timeOut": "22:29",
+        "symbol": null,
+        "location": "",
+        "timeInFinal": "08:52",
+        "timeOutFinal": "22:29",
+        "work": "1",
+        "workDays": 1,
+        "workHours": 7.6333,
+        "workStart": "08:52",
+        "workEnd": "17:30",
+        "minutesLate": 22,
+        "minutesEarly": 0,
+        "approvedApplicationForms": [],
+        "logWork": {
+          "id": 17238581,
+          "userId": 861,
+          "timeSpent": 28800,
+          "date": "2026-04-14T00:00:00.000Z",
+          "timeSpentHour": 8
+        },
+        "logWorkDiff": 0,
+        "logWorkNeeded": 8
+      },
+      {
+        "date": "2026-04-15T00:00:00.000Z",
+        "timeIn": "11:49",
+        "timeOut": "19:38",
+        "symbol": "P",
+        "location": "",
+        "timeInFinal": "08:30",
+        "timeOutFinal": "19:38",
+        "work": "1",
+        "workDays": 1,
+        "workHours": 8,
+        "workStart": "08:30",
+        "workEnd": "17:30",
+        "minutesLate": 0,
+        "minutesEarly": 0,
+        "approvedApplicationForms": [
+          {
+            "id": 102855,
+            "userId": 861,
+            "typeId": 1,
+            "startDate": "2026-04-15T00:00:00.000Z",
+            "endDate": "2026-04-15T00:00:00.000Z",
+            "data": {
+              "reasonId": 4,
+              "trackingTimes": [
+                {
+                  "dateStart": "2026-04-15",
+                  "dateEnd": "2026-04-15",
+                  "timeStart": "08:30",
+                  "timeEnd": "11:49",
+                  "countHour": 3.3166666666666664,
+                  "reasonId": 4
+                }
+              ],
+              "annualLeaveUsed": {
+                "last_year": 0,
+                "this_year": 0.4146
+              }
+            },
+            "createdAt": "2026-04-22T02:28:12.000Z",
+            "user": {
+              "id": 861,
+              "name": "Đỗ Huy Vượng",
+              "katakana_name": null,
+              "code": "KP.00442",
+              "email": "vuongdh@kaopiz.com",
+              "status": 1,
+              "timesheet_code": 73,
+              "jira_user_key": "JIRAUSER12511",
+              "department_id": 7,
+              "contract_department_id": 2,
+              "ksystem_roles": "LTV",
+              "application_form_config": {
+                "types": [
+                  {
+                    "type_id": 1,
+                    "max_days_after": 6,
+                    "max_days_before": 0
+                  },
+                  {
+                    "type_id": 2,
+                    "max_days_after": 6,
+                    "max_days_before": 0
+                  },
+                  {
+                    "type_id": 3,
+                    "max_days_after": 6,
+                    "max_days_before": 0
+                  },
+                  {
+                    "type_id": 4,
+                    "max_days_after": 6,
+                    "max_days_before": 0
+                  },
+                  {
+                    "type_id": 5,
+                    "max_days_after": 6,
+                    "max_days_before": 0
+                  },
+                  {
+                    "type_id": 6,
+                    "max_days_after": 6,
+                    "max_days_before": 0,
+                    "max_application_form_in_month": 40
+                  }
+                ]
+              },
+              "annual_leave_config": {
+                "allow_advance": 6
+              },
+              "email_verified_at": null,
+              "created_at": "2023-01-11T19:41:00.000000Z",
+              "updated_at": "2026-08-03T01:44:56.000000Z",
+              "deleted_at": null,
+              "deactive_at": null,
+              "working_start_date": "2022-05-30",
+              "official_start_date": "2022-07-30",
+              "working_end_date": null,
+              "work_time_id": null,
+              "user_working_time": null,
+              "work_time_contract_department": {
+                "work_time_id": 2,
+                "contract_department_id": 2,
+                "work_time": {
+                  "id": 2,
+                  "name": "Kaopiz Việt Nam",
+                  "work_start": "08:30",
+                  "work_end": "17:30",
+                  "lunch_start": "12:00",
+                  "lunch_end": "13:00",
+                  "dinner_start": "17:30",
+                  "dinner_end": "18:00",
+                  "working_hours_per_day": 8,
+                  "working_hours_per_shift": 8,
+                  "minutes_early_late_allowed": 90,
+                  "timezone": "VN",
+                  "created_at": "2024-08-06T04:18:55.000000Z",
+                  "updated_at": "2024-08-06T04:18:55.000000Z"
+                }
+              }
+            }
+          }
+        ],
+        "logWork": {
+          "id": 17238589,
+          "userId": 861,
+          "timeSpent": 16200,
+          "date": "2026-04-15T00:00:00.000Z",
+          "timeSpentHour": 4.5
+        },
+        "logWorkDiff": -0.1833,
+        "logWorkNeeded": 4.6833
+      },
+      {
+        "date": "2026-04-16T00:00:00.000Z",
+        "timeIn": "08:45",
+        "timeOut": "13:50",
+        "symbol": "I/O,V",
+        "location": "",
+        "timeInFinal": "08:30",
+        "timeOutFinal": "17:30",
+        "work": "1",
+        "workDays": 1,
+        "workHours": 8,
+        "workStart": "08:30",
+        "workEnd": "17:30",
+        "minutesLate": 0,
+        "minutesEarly": 0,
+        "approvedApplicationForms": [
+          {
+            "id": 102878,
+            "userId": 861,
+            "typeId": 4,
+            "startDate": "2026-04-16T00:00:00.000Z",
+            "endDate": "2026-04-16T00:00:00.000Z",
+            "data": {
+              "trackingTimes": [
+                {
+                  "date": "2026-04-16",
+                  "reasonId": 25
+                }
+              ]
+            },
+            "createdAt": "2026-04-22T04:18:38.000Z"
+          },
+          {
+            "id": 102880,
+            "userId": 861,
+            "typeId": 2,
+            "startDate": "2026-04-16T00:00:00.000Z",
+            "endDate": "2026-04-16T00:00:00.000Z",
+            "data": {
+              "trackingTimes": [
+                {
+                  "date": "2026-04-16",
+                  "timeStart": "08:30",
+                  "timeEnd": "08:45",
+                  "reasonId": 21
+                }
+              ]
+            },
+            "createdAt": "2026-04-22T04:21:57.000Z"
+          }
+        ],
+        "logWork": {
+          "id": 17238597,
+          "userId": 861,
+          "timeSpent": 28800,
+          "date": "2026-04-16T00:00:00.000Z",
+          "timeSpentHour": 8
+        },
+        "logWorkDiff": 0,
+        "logWorkNeeded": 8
+      },
+      {
+        "date": "2026-04-17T00:00:00.000Z",
+        "timeIn": "08:43",
+        "timeOut": "21:34",
+        "symbol": "V",
+        "location": "",
+        "timeInFinal": "08:30",
+        "timeOutFinal": "21:34",
+        "work": "1",
+        "workDays": 1,
+        "workHours": 8,
+        "workStart": "08:30",
+        "workEnd": "17:30",
+        "minutesLate": 0,
+        "minutesEarly": 0,
+        "approvedApplicationForms": [
+          {
+            "id": 102881,
+            "userId": 861,
+            "typeId": 2,
+            "startDate": "2026-04-17T00:00:00.000Z",
+            "endDate": "2026-04-17T00:00:00.000Z",
+            "data": {
+              "reasonId": 21,
+              "trackingTimes": [
+                {
+                  "date": "2026-04-17",
+                  "timeStart": "08:30",
+                  "timeEnd": "08:43",
+                  "reasonId": 21
+                }
+              ]
+            },
+            "createdAt": "2026-04-22T04:22:17.000Z"
+          }
+        ],
+        "logWork": {
+          "id": 17238603,
+          "userId": 861,
+          "timeSpent": 28800,
+          "date": "2026-04-17T00:00:00.000Z",
+          "timeSpentHour": 8
+        },
+        "logWorkDiff": 0,
+        "logWorkNeeded": 8
+      },
+      {
+        "date": "2026-04-18T00:00:00.000Z",
+        "timeIn": null,
+        "timeOut": null,
+        "symbol": null,
+        "location": "",
+        "timeInFinal": null,
+        "timeOutFinal": null,
+        "work": "N",
+        "workDays": 0,
+        "workHours": 0,
+        "workStart": null,
+        "workEnd": null,
+        "minutesLate": 0,
+        "minutesEarly": 0,
+        "approvedApplicationForms": [],
+        "logWork": null,
+        "logWorkDiff": 0,
+        "logWorkNeeded": 0
+      },
+      {
+        "date": "2026-04-19T00:00:00.000Z",
+        "timeIn": null,
+        "timeOut": null,
+        "symbol": null,
+        "location": "",
+        "timeInFinal": null,
+        "timeOutFinal": null,
+        "work": "N",
+        "workDays": 0,
+        "workHours": 0,
+        "workStart": null,
+        "workEnd": null,
+        "minutesLate": 0,
+        "minutesEarly": 0,
+        "approvedApplicationForms": [],
+        "logWork": null,
+        "logWorkDiff": 0,
+        "logWorkNeeded": 0
+      },
+      {
+        "date": "2026-04-20T00:00:00.000Z",
+        "timeIn": "08:42",
+        "timeOut": "18:25",
+        "symbol": "P",
+        "location": "",
+        "timeInFinal": "08:30",
+        "timeOutFinal": "18:25",
+        "work": "1",
+        "workDays": 1,
+        "workHours": 8,
+        "workStart": "08:30",
+        "workEnd": "17:30",
+        "minutesLate": 0,
+        "minutesEarly": 0,
+        "approvedApplicationForms": [
+          {
+            "id": 103639,
+            "userId": 861,
+            "typeId": 1,
+            "startDate": "2026-04-20T00:00:00.000Z",
+            "endDate": "2026-04-20T00:00:00.000Z",
+            "data": {
+              "reasonId": 4,
+              "trackingTimes": [
+                {
+                  "dateStart": "2026-04-20",
+                  "dateEnd": "2026-04-20",
+                  "timeStart": "08:30",
+                  "timeEnd": "08:31",
+                  "countHour": 0.016666666666667496,
+                  "reasonId": 4
+                }
+              ],
+              "annualLeaveUsed": {
+                "last_year": 0,
+                "this_year": 0.0021
+              }
+            },
+            "createdAt": "2026-04-27T15:59:34.000Z",
+            "user": {
+              "id": 861,
+              "name": "Đỗ Huy Vượng",
+              "katakana_name": null,
+              "code": "KP.00442",
+              "email": "vuongdh@kaopiz.com",
+              "status": 1,
+              "timesheet_code": 73,
+              "jira_user_key": "JIRAUSER12511",
+              "department_id": 7,
+              "contract_department_id": 2,
+              "ksystem_roles": "LTV",
+              "application_form_config": {
+                "types": [
+                  {
+                    "type_id": 1,
+                    "max_days_after": 6,
+                    "max_days_before": 0
+                  },
+                  {
+                    "type_id": 2,
+                    "max_days_after": 6,
+                    "max_days_before": 0
+                  },
+                  {
+                    "type_id": 3,
+                    "max_days_after": 6,
+                    "max_days_before": 0
+                  },
+                  {
+                    "type_id": 4,
+                    "max_days_after": 6,
+                    "max_days_before": 0
+                  },
+                  {
+                    "type_id": 5,
+                    "max_days_after": 6,
+                    "max_days_before": 0
+                  },
+                  {
+                    "type_id": 6,
+                    "max_days_after": 6,
+                    "max_days_before": 0,
+                    "max_application_form_in_month": 40
+                  }
+                ]
+              },
+              "annual_leave_config": {
+                "allow_advance": 6
+              },
+              "email_verified_at": null,
+              "created_at": "2023-01-11T19:41:00.000000Z",
+              "updated_at": "2026-08-03T01:44:56.000000Z",
+              "deleted_at": null,
+              "deactive_at": null,
+              "working_start_date": "2022-05-30",
+              "official_start_date": "2022-07-30",
+              "working_end_date": null,
+              "work_time_id": null,
+              "user_working_time": null,
+              "work_time_contract_department": {
+                "work_time_id": 2,
+                "contract_department_id": 2,
+                "work_time": {
+                  "id": 2,
+                  "name": "Kaopiz Việt Nam",
+                  "work_start": "08:30",
+                  "work_end": "17:30",
+                  "lunch_start": "12:00",
+                  "lunch_end": "13:00",
+                  "dinner_start": "17:30",
+                  "dinner_end": "18:00",
+                  "working_hours_per_day": 8,
+                  "working_hours_per_shift": 8,
+                  "minutes_early_late_allowed": 90,
+                  "timezone": "VN",
+                  "created_at": "2024-08-06T04:18:55.000000Z",
+                  "updated_at": "2024-08-06T04:18:55.000000Z"
+                }
+              }
+            }
+          }
+        ],
+        "logWork": {
+          "id": 17238611,
+          "userId": 861,
+          "timeSpent": 28800,
+          "date": "2026-04-20T00:00:00.000Z",
+          "timeSpentHour": 8
+        },
+        "logWorkDiff": 0.0167,
+        "logWorkNeeded": 7.9833
+      },
+      {
+        "date": "2026-04-21T00:00:00.000Z",
+        "timeIn": "08:51",
+        "timeOut": "19:38",
+        "symbol": "V",
+        "location": "",
+        "timeInFinal": "08:30",
+        "timeOutFinal": "19:38",
+        "work": "1",
+        "workDays": 1,
+        "workHours": 8,
+        "workStart": "08:30",
+        "workEnd": "17:30",
+        "minutesLate": 0,
+        "minutesEarly": 0,
+        "approvedApplicationForms": [
+          {
+            "id": 103636,
+            "userId": 861,
+            "typeId": 2,
+            "startDate": "2026-04-21T00:00:00.000Z",
+            "endDate": "2026-04-21T00:00:00.000Z",
+            "data": {
+              "reasonId": 21,
+              "trackingTimes": [
+                {
+                  "date": "2026-04-21",
+                  "timeStart": "08:30",
+                  "timeEnd": "08:51",
+                  "reasonId": 21
+                }
+              ]
+            },
+            "createdAt": "2026-04-27T15:59:31.000Z"
+          }
+        ],
+        "logWork": {
+          "id": 17238619,
+          "userId": 861,
+          "timeSpent": 28800,
+          "date": "2026-04-21T00:00:00.000Z",
+          "timeSpentHour": 8
+        },
+        "logWorkDiff": 0,
+        "logWorkNeeded": 8
+      },
+      {
+        "date": "2026-04-22T00:00:00.000Z",
+        "timeIn": "08:46",
+        "timeOut": "22:22",
+        "symbol": "P",
+        "location": "",
+        "timeInFinal": "08:30",
+        "timeOutFinal": "22:22",
+        "work": "1",
+        "workDays": 1,
+        "workHours": 8,
+        "workStart": "08:30",
+        "workEnd": "17:30",
+        "minutesLate": 0,
+        "minutesEarly": 0,
+        "approvedApplicationForms": [
+          {
+            "id": 103638,
+            "userId": 861,
+            "typeId": 1,
+            "startDate": "2026-04-22T00:00:00.000Z",
+            "endDate": "2026-04-22T00:00:00.000Z",
+            "data": {
+              "reasonId": 4,
+              "trackingTimes": [
+                {
+                  "dateStart": "2026-04-22",
+                  "dateEnd": "2026-04-22",
+                  "timeStart": "08:30",
+                  "timeEnd": "08:46",
+                  "countHour": 0.2666666666666675,
+                  "reasonId": 4
+                }
+              ],
+              "annualLeaveUsed": {
+                "last_year": 0,
+                "this_year": 0.0333
+              }
+            },
+            "createdAt": "2026-04-27T15:59:33.000Z",
+            "user": {
+              "id": 861,
+              "name": "Đỗ Huy Vượng",
+              "katakana_name": null,
+              "code": "KP.00442",
+              "email": "vuongdh@kaopiz.com",
+              "status": 1,
+              "timesheet_code": 73,
+              "jira_user_key": "JIRAUSER12511",
+              "department_id": 7,
+              "contract_department_id": 2,
+              "ksystem_roles": "LTV",
+              "application_form_config": {
+                "types": [
+                  {
+                    "type_id": 1,
+                    "max_days_after": 6,
+                    "max_days_before": 0
+                  },
+                  {
+                    "type_id": 2,
+                    "max_days_after": 6,
+                    "max_days_before": 0
+                  },
+                  {
+                    "type_id": 3,
+                    "max_days_after": 6,
+                    "max_days_before": 0
+                  },
+                  {
+                    "type_id": 4,
+                    "max_days_after": 6,
+                    "max_days_before": 0
+                  },
+                  {
+                    "type_id": 5,
+                    "max_days_after": 6,
+                    "max_days_before": 0
+                  },
+                  {
+                    "type_id": 6,
+                    "max_days_after": 6,
+                    "max_days_before": 0,
+                    "max_application_form_in_month": 40
+                  }
+                ]
+              },
+              "annual_leave_config": {
+                "allow_advance": 6
+              },
+              "email_verified_at": null,
+              "created_at": "2023-01-11T19:41:00.000000Z",
+              "updated_at": "2026-08-03T01:44:56.000000Z",
+              "deleted_at": null,
+              "deactive_at": null,
+              "working_start_date": "2022-05-30",
+              "official_start_date": "2022-07-30",
+              "working_end_date": null,
+              "work_time_id": null,
+              "user_working_time": null,
+              "work_time_contract_department": {
+                "work_time_id": 2,
+                "contract_department_id": 2,
+                "work_time": {
+                  "id": 2,
+                  "name": "Kaopiz Việt Nam",
+                  "work_start": "08:30",
+                  "work_end": "17:30",
+                  "lunch_start": "12:00",
+                  "lunch_end": "13:00",
+                  "dinner_start": "17:30",
+                  "dinner_end": "18:00",
+                  "working_hours_per_day": 8,
+                  "working_hours_per_shift": 8,
+                  "minutes_early_late_allowed": 90,
+                  "timezone": "VN",
+                  "created_at": "2024-08-06T04:18:55.000000Z",
+                  "updated_at": "2024-08-06T04:18:55.000000Z"
+                }
+              }
+            }
+          }
+        ],
+        "logWork": {
+          "id": 17238627,
+          "userId": 861,
+          "timeSpent": 28800,
+          "date": "2026-04-22T00:00:00.000Z",
+          "timeSpentHour": 8
+        },
+        "logWorkDiff": 0.2667,
+        "logWorkNeeded": 7.7333
+      },
+      {
+        "date": "2026-04-23T00:00:00.000Z",
+        "timeIn": "08:48",
+        "timeOut": "18:52",
+        "symbol": "P",
+        "location": "",
+        "timeInFinal": "08:30",
+        "timeOutFinal": "18:52",
+        "work": "1",
+        "workDays": 1,
+        "workHours": 8,
+        "workStart": "08:30",
+        "workEnd": "17:30",
+        "minutesLate": 0,
+        "minutesEarly": 0,
+        "approvedApplicationForms": [
+          {
+            "id": 103637,
+            "userId": 861,
+            "typeId": 1,
+            "startDate": "2026-04-23T00:00:00.000Z",
+            "endDate": "2026-04-23T00:00:00.000Z",
+            "data": {
+              "reasonId": 4,
+              "trackingTimes": [
+                {
+                  "dateStart": "2026-04-23",
+                  "dateEnd": "2026-04-23",
+                  "timeStart": "08:30",
+                  "timeEnd": "08:48",
+                  "countHour": 0.3000000000000007,
+                  "reasonId": 4
+                }
+              ],
+              "annualLeaveUsed": {
+                "last_year": 0,
+                "this_year": 0.0375
+              }
+            },
+            "createdAt": "2026-04-27T15:59:32.000Z",
+            "user": {
+              "id": 861,
+              "name": "Đỗ Huy Vượng",
+              "katakana_name": null,
+              "code": "KP.00442",
+              "email": "vuongdh@kaopiz.com",
+              "status": 1,
+              "timesheet_code": 73,
+              "jira_user_key": "JIRAUSER12511",
+              "department_id": 7,
+              "contract_department_id": 2,
+              "ksystem_roles": "LTV",
+              "application_form_config": {
+                "types": [
+                  {
+                    "type_id": 1,
+                    "max_days_after": 6,
+                    "max_days_before": 0
+                  },
+                  {
+                    "type_id": 2,
+                    "max_days_after": 6,
+                    "max_days_before": 0
+                  },
+                  {
+                    "type_id": 3,
+                    "max_days_after": 6,
+                    "max_days_before": 0
+                  },
+                  {
+                    "type_id": 4,
+                    "max_days_after": 6,
+                    "max_days_before": 0
+                  },
+                  {
+                    "type_id": 5,
+                    "max_days_after": 6,
+                    "max_days_before": 0
+                  },
+                  {
+                    "type_id": 6,
+                    "max_days_after": 6,
+                    "max_days_before": 0,
+                    "max_application_form_in_month": 40
+                  }
+                ]
+              },
+              "annual_leave_config": {
+                "allow_advance": 6
+              },
+              "email_verified_at": null,
+              "created_at": "2023-01-11T19:41:00.000000Z",
+              "updated_at": "2026-08-03T01:44:56.000000Z",
+              "deleted_at": null,
+              "deactive_at": null,
+              "working_start_date": "2022-05-30",
+              "official_start_date": "2022-07-30",
+              "working_end_date": null,
+              "work_time_id": null,
+              "user_working_time": null,
+              "work_time_contract_department": {
+                "work_time_id": 2,
+                "contract_department_id": 2,
+                "work_time": {
+                  "id": 2,
+                  "name": "Kaopiz Việt Nam",
+                  "work_start": "08:30",
+                  "work_end": "17:30",
+                  "lunch_start": "12:00",
+                  "lunch_end": "13:00",
+                  "dinner_start": "17:30",
+                  "dinner_end": "18:00",
+                  "working_hours_per_day": 8,
+                  "working_hours_per_shift": 8,
+                  "minutes_early_late_allowed": 90,
+                  "timezone": "VN",
+                  "created_at": "2024-08-06T04:18:55.000000Z",
+                  "updated_at": "2024-08-06T04:18:55.000000Z"
+                }
+              }
+            }
+          }
+        ],
+        "logWork": {
+          "id": 17238635,
+          "userId": 861,
+          "timeSpent": 28800,
+          "date": "2026-04-23T00:00:00.000Z",
+          "timeSpentHour": 8
+        },
+        "logWorkDiff": 0.3,
+        "logWorkNeeded": 7.7
+      },
+      {
+        "date": "2026-04-24T00:00:00.000Z",
+        "timeIn": "08:52",
+        "timeOut": "21:49",
+        "symbol": "V",
+        "location": "",
+        "timeInFinal": "08:30",
+        "timeOutFinal": "21:49",
+        "work": "1",
+        "workDays": 1,
+        "workHours": 8,
+        "workStart": "08:30",
+        "workEnd": "17:30",
+        "minutesLate": 0,
+        "minutesEarly": 0,
+        "approvedApplicationForms": [
+          {
+            "id": 103635,
+            "userId": 861,
+            "typeId": 2,
+            "startDate": "2026-04-24T00:00:00.000Z",
+            "endDate": "2026-04-24T00:00:00.000Z",
+            "data": {
+              "reasonId": 21,
+              "trackingTimes": [
+                {
+                  "date": "2026-04-24",
+                  "timeStart": "08:30",
+                  "timeEnd": "08:52",
+                  "reasonId": 21
+                }
+              ]
+            },
+            "createdAt": "2026-04-27T15:59:30.000Z"
+          }
+        ],
+        "logWork": {
+          "id": 17238643,
+          "userId": 861,
+          "timeSpent": 28800,
+          "date": "2026-04-24T00:00:00.000Z",
+          "timeSpentHour": 8
+        },
+        "logWorkDiff": 0,
+        "logWorkNeeded": 8
+      },
+      {
+        "date": "2026-04-25T00:00:00.000Z",
+        "timeIn": null,
+        "timeOut": null,
+        "symbol": null,
+        "location": "",
+        "timeInFinal": null,
+        "timeOutFinal": null,
+        "work": "N",
+        "workDays": 0,
+        "workHours": 0,
+        "workStart": null,
+        "workEnd": null,
+        "minutesLate": 0,
+        "minutesEarly": 0,
+        "approvedApplicationForms": [],
+        "logWork": null,
+        "logWorkDiff": 0,
+        "logWorkNeeded": 0
+      },
+      {
+        "date": "2026-04-26T00:00:00.000Z",
+        "timeIn": null,
+        "timeOut": null,
+        "symbol": null,
+        "location": "",
+        "timeInFinal": null,
+        "timeOutFinal": null,
+        "work": "N",
+        "workDays": 0,
+        "workHours": 0,
+        "workStart": null,
+        "workEnd": null,
+        "minutesLate": 0,
+        "minutesEarly": 0,
+        "approvedApplicationForms": [],
+        "logWork": null,
+        "logWorkDiff": 0,
+        "logWorkNeeded": 0
+      },
+      {
+        "date": "2026-04-27T00:00:00.000Z",
+        "timeIn": null,
+        "timeOut": null,
+        "symbol": null,
+        "location": "",
+        "timeInFinal": null,
+        "timeOutFinal": null,
+        "work": "NB",
+        "workDays": 1,
+        "workHours": 8,
+        "workStart": null,
+        "workEnd": null,
+        "minutesLate": 0,
+        "minutesEarly": 0,
+        "approvedApplicationForms": [],
+        "logWork": null,
+        "logWorkDiff": 0,
+        "logWorkNeeded": 0
+      },
+      {
+        "date": "2026-04-28T00:00:00.000Z",
+        "timeIn": "08:35",
+        "timeOut": "19:21",
+        "symbol": "V",
+        "location": "",
+        "timeInFinal": "08:30",
+        "timeOutFinal": "19:21",
+        "work": "1",
+        "workDays": 1,
+        "workHours": 8,
+        "workStart": "08:30",
+        "workEnd": "17:30",
+        "minutesLate": 0,
+        "minutesEarly": 0,
+        "approvedApplicationForms": [
+          {
+            "id": 104423,
+            "userId": 861,
+            "typeId": 2,
+            "startDate": "2026-04-28T00:00:00.000Z",
+            "endDate": "2026-04-28T00:00:00.000Z",
+            "data": {
+              "reasonId": 21,
+              "trackingTimes": [
+                {
+                  "date": "2026-04-28",
+                  "timeStart": "08:30",
+                  "timeEnd": "08:35",
+                  "reasonId": 21
+                }
+              ]
+            },
+            "createdAt": "2026-05-04T02:36:05.000Z"
+          }
+        ],
+        "logWork": {
+          "id": 17238652,
+          "userId": 861,
+          "timeSpent": 28800,
+          "date": "2026-04-28T00:00:00.000Z",
+          "timeSpentHour": 8
+        },
+        "logWorkDiff": 0,
+        "logWorkNeeded": 8
+      },
+      {
+        "date": "2026-04-29T00:00:00.000Z",
+        "timeIn": null,
+        "timeOut": null,
+        "symbol": "P",
+        "location": "",
+        "timeInFinal": "08:30",
+        "timeOutFinal": "17:30",
+        "work": "1",
+        "workDays": 1,
+        "workHours": 8,
+        "workStart": "08:30",
+        "workEnd": "17:30",
+        "minutesLate": 0,
+        "minutesEarly": 0,
+        "approvedApplicationForms": [
+          {
+            "id": 104452,
+            "userId": 861,
+            "typeId": 1,
+            "startDate": "2026-04-29T00:00:00.000Z",
+            "endDate": "2026-04-29T00:00:00.000Z",
+            "data": {
+              "reasonId": 4,
+              "trackingTimes": [
+                {
+                  "dateStart": "2026-04-29",
+                  "dateEnd": "2026-04-29",
+                  "timeStart": "08:30",
+                  "timeEnd": "17:30",
+                  "countHour": 8,
+                  "reasonId": 4
+                }
+              ],
+              "annualLeaveUsed": {
+                "last_year": 0,
+                "this_year": 1
+              }
+            },
+            "createdAt": "2026-05-04T02:46:56.000Z",
+            "user": {
+              "id": 861,
+              "name": "Đỗ Huy Vượng",
+              "katakana_name": null,
+              "code": "KP.00442",
+              "email": "vuongdh@kaopiz.com",
+              "status": 1,
+              "timesheet_code": 73,
+              "jira_user_key": "JIRAUSER12511",
+              "department_id": 7,
+              "contract_department_id": 2,
+              "ksystem_roles": "LTV",
+              "application_form_config": {
+                "types": [
+                  {
+                    "type_id": 1,
+                    "max_days_after": 6,
+                    "max_days_before": 0
+                  },
+                  {
+                    "type_id": 2,
+                    "max_days_after": 6,
+                    "max_days_before": 0
+                  },
+                  {
+                    "type_id": 3,
+                    "max_days_after": 6,
+                    "max_days_before": 0
+                  },
+                  {
+                    "type_id": 4,
+                    "max_days_after": 6,
+                    "max_days_before": 0
+                  },
+                  {
+                    "type_id": 5,
+                    "max_days_after": 6,
+                    "max_days_before": 0
+                  },
+                  {
+                    "type_id": 6,
+                    "max_days_after": 6,
+                    "max_days_before": 0,
+                    "max_application_form_in_month": 40
+                  }
+                ]
+              },
+              "annual_leave_config": {
+                "allow_advance": 6
+              },
+              "email_verified_at": null,
+              "created_at": "2023-01-11T19:41:00.000000Z",
+              "updated_at": "2026-08-03T01:44:56.000000Z",
+              "deleted_at": null,
+              "deactive_at": null,
+              "working_start_date": "2022-05-30",
+              "official_start_date": "2022-07-30",
+              "working_end_date": null,
+              "work_time_id": null,
+              "user_working_time": null,
+              "work_time_contract_department": {
+                "work_time_id": 2,
+                "contract_department_id": 2,
+                "work_time": {
+                  "id": 2,
+                  "name": "Kaopiz Việt Nam",
+                  "work_start": "08:30",
+                  "work_end": "17:30",
+                  "lunch_start": "12:00",
+                  "lunch_end": "13:00",
+                  "dinner_start": "17:30",
+                  "dinner_end": "18:00",
+                  "working_hours_per_day": 8,
+                  "working_hours_per_shift": 8,
+                  "minutes_early_late_allowed": 90,
+                  "timezone": "VN",
+                  "created_at": "2024-08-06T04:18:55.000000Z",
+                  "updated_at": "2024-08-06T04:18:55.000000Z"
+                }
+              }
+            }
+          }
+        ],
+        "logWork": null,
+        "logWorkDiff": 0,
+        "logWorkNeeded": 0
+      },
+      {
+        "date": "2026-04-30T00:00:00.000Z",
+        "timeIn": null,
+        "timeOut": null,
+        "symbol": null,
+        "location": "",
+        "timeInFinal": null,
+        "timeOutFinal": null,
+        "work": "NL",
+        "workDays": 1,
+        "workHours": 8,
+        "workStart": null,
+        "workEnd": null,
+        "minutesLate": 0,
+        "minutesEarly": 0,
+        "approvedApplicationForms": [],
+        "logWork": null,
+        "logWorkDiff": 0,
+        "logWorkNeeded": 0
+      }
+    ],
+    "leave": {
+      "healthInsuranceLeave": 0,
+      "marriageLeave": 0,
+      "filialLeave": 0,
+      "unpaidLeave": 0,
+      "annualLeave": 2.4875,
+      "unpaidLeaveWithoutApplication": 0,
+      "totalUnpaid": 0
+    },
+    "annualLeaveInfo": {
+      "used": 2.4875,
+      "usedThisYear": 4.2586,
+      "availableThisYear": -0.2591,
+      "remainingLastYear": 0
+    },
+    "overtime": {
+      "actual": 0,
+      "multipliedByRate": 0,
+      "compensatoryLeave": 0
+    },
+    "absence": {
+      "absenceCompensatoryLeave": 0
+    },
+    "workingStartDate": "2022-05-30T00:00:00.000Z",
+    "workingEndDate": null,
+    "summary": {
+      "minutesLate": 79,
+      "minutesEarly": 0,
+      "numbersLate": 6,
+      "numbersEarly": 0,
+      "fines": 0,
+      "bonus": 0,
+      "actualWorkingDay": 17.5125,
+      "timekeepingHolidays": 2,
+      "numbersLogWorkDiff": 4
+    },
+    "total": {
+      "workHour": 174.6834,
+      "workDay": 22,
+      "standardWorkday": 22,
+      "logWorkHour": 140.5,
+      "logWorkDiff": 0.4001
+    }
+  }
+}

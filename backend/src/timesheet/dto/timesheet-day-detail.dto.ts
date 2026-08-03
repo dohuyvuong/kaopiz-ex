@@ -1,7 +1,11 @@
 import { Expose, Transform, Type } from 'class-transformer';
+import {
+  ApplicationFormDataDto,
+  ApplicationFormTypeDto,
+} from './application-form.dto';
 
 /**
- * DTO cho TimeSheet record (check-in/check-out)
+ * DTO cho TimeSheet record (một lần quẹt máy chấm công)
  */
 export class TimeSheetRecordDto {
   @Expose()
@@ -16,44 +20,10 @@ export class TimeSheetRecordDto {
 }
 
 /**
- * DTO cho TrackingTime trong day detail
- */
-export class TrackingTimeDto {
-  @Expose()
-  date?: string;
-
-  @Expose({ name: 'time_start' })
-  timeStart?: string;
-
-  @Expose({ name: 'time_end' })
-  timeEnd?: string;
-
-  @Expose({ name: 'reason_id' })
-  reasonId?: number;
-}
-
-/**
- * DTO cho ApplicationFormData trong day detail
- */
-export class ApplicationFormDataDto {
-  @Expose({ name: 'tracking_times' })
-  @Type(() => TrackingTimeDto)
-  trackingTimes?: TrackingTimeDto[];
-}
-
-/**
- * DTO cho ApplicationFormType
- */
-export class ApplicationFormTypeDto {
-  @Expose()
-  id: number;
-
-  @Expose()
-  name: string;
-}
-
-/**
- * DTO cho ApplicationForm trong day detail
+ * DTO cho ApplicationForm trong day detail.
+ *
+ * Khác calendar ở đúng một điểm: calendar chỉ trả đơn ĐÃ DUYỆT, còn day-detail
+ * trả cả đơn chờ duyệt nên có thêm `status` (3 = đã duyệt).
  */
 export class DayDetailApplicationFormDto {
   @Expose()

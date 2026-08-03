@@ -1,17 +1,17 @@
 'use client';
 
-import { TimesheetDay } from '@/lib/types/timesheet';
-import { DayDetailApplicationForm } from '@/lib/types/timesheet-day-detail';
+import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -19,346 +19,230 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Combobox } from '@/components/ui/combobox';
-import { AlertCircle, Loader2 } from 'lucide-react';
-import dayjs from 'dayjs';
-import { toast } from 'sonner';
+import { AlertTriangle, Loader2 } from 'lucide-react';
 import { useCreateApplicationForm } from '@/hooks/use-create-application-form';
-
-interface CreateApplicationFormDialogData {
-  date: string; // Format: "YYYY-MM-DD"
-  calendarDay?: TimesheetDay | null;
-  workingTime?: { workStart: string; workEnd: string } | null;
-  calendarDays?: Array<{ date: Date; timesheet: TimesheetDay | null }>;
-  mergedDays?: Map<string, TimesheetDay & { hasPendingForms?: boolean }>;
-  dayDetail?: { applicationForms?: DayDetailApplicationForm[] } | null;
-  userId?: number; // User ID từ calendar response
-}
+import type { CalendarDay, TimesheetRules } from '@kaopiz/timesheet';
 
 interface CreateApplicationFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  data: CreateApplicationFormDialogData;
-  onSuccess: () => void;
+  date: string;
+  day: CalendarDay | null;
+  rules: TimesheetRules | null;
+  daysByDate: Map<string, CalendarDay>;
+  userId?: number;
+  today: string;
+  onCreated: () => void;
 }
 
 export function CreateApplicationFormDialog({
   open,
   onOpenChange,
-  data,
-  onSuccess,
+  date,
+  day,
+  rules,
+  daysByDate,
+  userId,
+  today,
+  onCreated,
 }: CreateApplicationFormDialogProps) {
-  const {
-    typeId,
-    setTypeId,
-    reasonId,
-    setReasonId,
-    approverIds,
-    setApproverId,
-    timeStart,
-    setTimeStart,
-    timeEnd,
-    setTimeEnd,
-    types,
-    selectedType,
-    availableReasons,
-    selectedReason,
-    selectedReasonDisplayName,
-    approvers,
-    loadingApprovers,
-    loading,
-    loadingTypes,
-    error,
-    validationError,
-    warningMessage,
-    minutes,
-    handleSubmit: handleSubmitInternal,
-  } = useCreateApplicationForm({
+  const form = useCreateApplicationForm({
     open,
-    date: data.date,
-    calendarDay: data.calendarDay,
-    workingTime: data.workingTime,
-    calendarDays: data.calendarDays,
-    mergedDays: data.mergedDays,
-    dayDetail: data.dayDetail,
-    userId: data.userId,
+    date,
+    day,
+    rules,
+    daysByDate,
+    userId,
+    today,
   });
 
+  const selectedReason = form.reasons.find(
+    (reason) => reason.id === form.reasonId,
+  );
+
   const handleSubmit = async () => {
-    const success = await handleSubmitInternal();
-    if (success) {
-      toast.success('Tạo đơn từ thành công');
-      onSuccess();
-      onOpenChange(false);
+    if (await form.submit()) {
+      toast.success('Đã tạo đơn từ');
+      onCreated();
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] max-h-[calc(100vh-2rem)] overflow-hidden p-0 gap-0 flex flex-col">
-        <DialogHeader className="px-6 pt-6 pb-4 border-b">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
+        <DialogHeader>
           <DialogTitle>Tạo đơn từ</DialogTitle>
           <DialogDescription>
-            Tạo đơn từ cho ngày {dayjs(data.date).format('DD/MM/YYYY')}
+            Cho ngày {date}. Cảnh báo bên dưới chỉ để tham khảo — HRM mới là nơi
+            quyết định đơn có được chấp nhận hay không.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
-          <div className="space-y-4">
-          {loadingTypes ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              <span className="ml-2 text-sm text-muted-foreground">
-                Đang tải danh sách loại đơn...
+        <div className="space-y-4 overflow-y-auto flex-1 pr-1">
+          <div className="space-y-2">
+            <Label htmlFor="typeId">Loại đơn</Label>
+            <Select
+              value={String(form.typeId)}
+              onValueChange={(value) => form.setTypeId(Number(value))}
+              disabled={form.isLoadingTypes}
+            >
+              <SelectTrigger id="typeId" className="w-full">
+                <SelectValue placeholder="Chọn loại đơn" />
+              </SelectTrigger>
+              <SelectContent>
+                {form.types.map((type) => (
+                  <SelectItem key={type.id} value={String(type.id)}>
+                    {type.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="reasonId">Lý do</Label>
+            <Select
+              value={form.reasonId != null ? String(form.reasonId) : ''}
+              onValueChange={(value) => form.setReasonId(Number(value))}
+            >
+              <SelectTrigger id="reasonId" className="w-full">
+                <SelectValue placeholder="Chọn lý do" />
+              </SelectTrigger>
+              <SelectContent>
+                {form.reasons.map((reason) => (
+                  <SelectItem key={reason.id} value={String(reason.id)}>
+                    {reason.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {/* HRM ghi giới hạn ngay trong description, vd "Tối đa: 2 Lần / Tuần". */}
+            {selectedReason?.description && (
+              <p className="text-xs text-muted-foreground">
+                {selectedReason.description}
+              </p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="timeStart">Từ</Label>
+              <Input
+                id="timeStart"
+                type="time"
+                value={form.timeStart}
+                onChange={(event) => form.setTimeStart(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="timeEnd">Đến</Label>
+              <Input
+                id="timeEnd"
+                type="time"
+                value={form.timeEnd}
+                onChange={(event) => form.setTimeEnd(event.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="text-sm text-muted-foreground">
+            {form.minutes != null ? (
+              <>
+                Thời lượng: <strong>{form.minutes} phút</strong>
+              </>
+            ) : (
+              <span className="text-destructive">
+                Giờ kết thúc phải sau giờ bắt đầu
               </span>
+            )}
+          </div>
+
+          {form.isLoadingApprovers ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Đang tải danh sách người duyệt...
             </div>
           ) : (
-            <>
-              {/* Loại đơn */}
-              <div className="space-y-2">
-                <Label htmlFor="typeId">Loại đơn</Label>
+            Array.from({ length: form.approverCount }, (_, order) => (
+              <div key={order} className="space-y-2">
+                <Label htmlFor={`approver-${order}`}>
+                  Người duyệt {order + 1}
+                </Label>
                 <Select
-                  value={String(typeId)}
-                  onValueChange={(value) => setTypeId(Number(value))}
+                  value={
+                    form.approverIds[order] != null
+                      ? String(form.approverIds[order])
+                      : ''
+                  }
+                  onValueChange={(value) =>
+                    form.setApproverId(order, Number(value))
+                  }
                 >
-                  <SelectTrigger id="typeId" className="w-full">
-                    <SelectValue placeholder="Chọn loại đơn" />
+                  <SelectTrigger id={`approver-${order}`} className="w-full">
+                    <SelectValue placeholder="Chọn người duyệt" />
                   </SelectTrigger>
                   <SelectContent>
-                    {types.map((type) => (
-                      <SelectItem key={type.id} value={String(type.id)}>
-                        {type.name}
+                    {(form.approvers[order] ?? []).map((approver) => (
+                      <SelectItem
+                        key={approver.userId}
+                        value={String(approver.userId)}
+                      >
+                        {approver.user?.name ?? `User ${approver.userId}`}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-
-              {/* Lý do */}
-              {selectedType && availableReasons.length > 0 && (
-                <div className="space-y-2">
-                  <Label htmlFor="reasonId">Lý do</Label>
-                  <Select
-                    value={reasonId ? String(reasonId) : ''}
-                    onValueChange={(value) =>
-                      setReasonId(value ? Number(value) : null)
-                    }
-                  >
-                    <SelectTrigger id="reasonId" className="w-full">
-                      <SelectValue placeholder="Chọn lý do">
-                        {selectedReasonDisplayName || undefined}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableReasons.map((reason) => (
-                        <SelectItem key={reason.id} value={String(reason.id)}>
-                          <div className="flex flex-col">
-                            <span className="font-medium">{reason.name}</span>
-                            {reason.description && (
-                              <span className="text-xs text-muted-foreground">
-                                {reason.description}
-                              </span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {/* Hiển thị description của reason đã chọn */}
-                  {selectedReason?.description && (
-                    <p className="text-xs text-muted-foreground">
-                      {selectedReason.description}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Người duyệt */}
-              {selectedType && selectedType.orderMax > 0 && (
-                <div className="space-y-4">
-                  {loadingApprovers ? (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Đang tải danh sách người duyệt...
-                    </div>
-                  ) : (
-                    // Loop từ 0 đến orderMax - 1
-                    Array.from({ length: selectedType.orderMax }, (_, index) => {
-                      const order = index; // 0-based
-                      const approverId = approverIds[order] || null;
-                      const approversList = approvers[order] || [];
-
-                      // Chuyển đổi sang format cho Combobox
-                      const comboboxOptions = approversList.map((approver) => ({
-                        value: String(approver.userId),
-                        label: `${approver.user.name} (${approver.user.email})`,
-                      }));
-
-                      return (
-                        <div key={order} className="space-y-2">
-                          <Label htmlFor={`approver-${order}`}>
-                            Người duyệt {order + 1} *
-                          </Label>
-                          <Combobox
-                            options={comboboxOptions}
-                            value={approverId ? String(approverId) : undefined}
-                            onValueChange={(value) =>
-                              setApproverId(
-                                order,
-                                value ? Number(value) : null,
-                              )
-                            }
-                            placeholder={`Chọn người duyệt ${order + 1}`}
-                            searchPlaceholder="Tìm kiếm người duyệt..."
-                            emptyText="Không tìm thấy người duyệt."
-                            disabled={loadingApprovers}
-                          />
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              )}
-            </>
+            ))
           )}
 
-          {/* Thời gian (cho đơn Vắng mặt) */}
-          {typeId === 2 && (
-            <div className="space-y-4">
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-                <div className="text-xs text-blue-700 mb-2">
-                  Thời gian đã được tự động xác định dựa trên dữ liệu chấm công
-                </div>
-                {data.calendarDay && data.calendarDay.minutesLate > 0 && (
-                  <div className="text-xs text-blue-600">
-                    Đi muộn {data.calendarDay.minutesLate} phút: từ {data.workingTime?.workStart || '08:30'} đến tối đa 1 tiếng (hoặc {data.calendarDay.timeIn} nếu sớm hơn)
-                  </div>
-                )}
-                {data.calendarDay && data.calendarDay.minutesEarly > 0 && (
-                  <div className="text-xs text-blue-600">
-                    Về sớm {data.calendarDay.minutesEarly} phút: từ tối đa 1 tiếng trước {data.workingTime?.workEnd || '17:30'} (hoặc {data.calendarDay.timeOut} nếu muộn hơn) đến {data.workingTime?.workEnd || '17:30'}
-                  </div>
-                )}
+          {form.warnings.length > 0 && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 p-3 space-y-2">
+              <div className="flex items-center gap-2 text-sm font-medium text-amber-900">
+                <AlertTriangle className="h-4 w-4" />
+                Lưu ý trước khi gửi
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="timeStart">Thời gian bắt đầu</Label>
-                  <Input
-                    id="timeStart"
-                    type="time"
-                    value={timeStart}
-                    onChange={(e) => setTimeStart(e.target.value)}
-                    placeholder="08:30"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="timeEnd">Thời gian kết thúc</Label>
-                  <Input
-                    id="timeEnd"
-                    type="time"
-                    value={timeEnd}
-                    onChange={(e) => setTimeEnd(e.target.value)}
-                    placeholder="09:00"
-                  />
-                </div>
-              </div>
-              {minutes !== null && (
-                <div className="text-sm text-muted-foreground">
-                  Số phút: <span className="font-semibold">{minutes} phút</span>
-                  {minutes > 60 && (
-                    <span className="text-destructive ml-2">
-                      (Vượt quá 60 phút)
-                    </span>
-                  )}
-                </div>
-              )}
+              <ul className="list-disc pl-5 space-y-1 text-sm text-amber-900">
+                {form.warnings.map((warning) => (
+                  <li key={warning.code}>{warning.message}</li>
+                ))}
+              </ul>
+              <p className="text-xs text-amber-800">
+                Vẫn gửi được — HRM sẽ quyết định.
+              </p>
             </div>
           )}
 
-          {/* Thời gian (cho đơn Nghỉ phép - optional) */}
-          {typeId === 1 && (
-            <div className="space-y-4">
-              {timeStart && timeEnd ? (
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-                  <div className="text-xs text-blue-700">
-                    Thời gian đã được tự động xác định: {timeStart} - {timeEnd}
-                    {timeStart === (data.workingTime?.workStart || '08:30') && timeEnd === (data.workingTime?.workEnd || '17:30') ? ' (cả ngày)' : ''}
-                  </div>
-                </div>
-              ) : (
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-                  <div className="text-xs text-blue-700">
-                    Vui lòng nhập thời gian nghỉ phép. Thời gian mặc định: {data.workingTime?.workStart || '08:30'} - {data.workingTime?.workEnd || '17:30'} (cả ngày)
-                  </div>
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="timeStart">Thời gian bắt đầu (tùy chọn)</Label>
-                  <Input
-                    id="timeStart"
-                    type="time"
-                    value={timeStart}
-                    onChange={(e) => setTimeStart(e.target.value)}
-                    placeholder="08:30"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="timeEnd">Thời gian kết thúc (tùy chọn)</Label>
-                  <Input
-                    id="timeEnd"
-                    type="time"
-                    value={timeEnd}
-                    onChange={(e) => setTimeEnd(e.target.value)}
-                    placeholder="17:30"
-                  />
-                </div>
-              </div>
+          {form.error && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+              {form.error}
             </div>
           )}
-
-          {/* Warning message */}
-          {warningMessage && (
-            <div className="p-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 shrink-0" />
-              {warningMessage}
-            </div>
-          )}
-
-          {/* Validation error */}
-          {validationError && (
-            <div className="p-3 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 shrink-0" />
-              {validationError}
-            </div>
-          )}
-
-          {/* Error */}
-          {error && (
-            <div className="p-3 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 shrink-0" />
-              {error}
-            </div>
-          )}
-          </div>
         </div>
 
-        {/* Actions cố định ở footer */}
-        <div className="shrink-0 border-t px-6 py-4">
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={loading}
-            >
-              Hủy
-            </Button>
-            <Button onClick={handleSubmit} disabled={loading}>
-              {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Tạo đơn
-            </Button>
-          </div>
-        </div>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={form.isSubmitting}
+          >
+            Huỷ
+          </Button>
+          <Button
+            onClick={() => void handleSubmit()}
+            disabled={!form.canSubmit}
+            title={
+              form.missingApproverOrder >= 0
+                ? `Chưa chọn người duyệt ${form.missingApproverOrder + 1}`
+                : undefined
+            }
+          >
+            {form.isSubmitting && (
+              <Loader2 className="h-4 w-4 animate-spin mr-1" />
+            )}
+            Tạo đơn
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

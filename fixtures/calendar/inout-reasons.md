@@ -1,0 +1,54 @@
+Description: API get all reason for checkin/checkout application.
+
+API: GET https://api.hrm.kaopiz.com/api/master/all-reasons?type_id_equal=4&is_use_equal=1
+
+Payload:
+
+Response:
+```
+{
+    "items": [
+        {
+            "id": 23,
+            "name": "Máy chấm công hỏng",
+            "description": "Tối đa 5 lần \/ Tuần",
+            "data": {
+                "is_calculate_salary": 1
+            }
+        },
+        {
+            "id": 24,
+            "name": "Lý do làm việc ngoài, công tác",
+            "description": "Tối đa 2 lần \/ Tháng",
+            "data": {
+                "is_calculate_salary": 1
+            }
+        },
+        {
+            "id": 25,
+            "name": "Quên chốt vân tay",
+            "description": "Tối đa 5 lần \/ Tuần",
+            "data": {
+                "is_calculate_salary": 1,
+                "is_required_attachments": 1
+            }
+        },
+        {
+            "id": 26,
+            "name": "Chưa có mã vân tay",
+            "description": "Tối đa 1 lần \/ Tuần",
+            "data": {
+                "is_calculate_salary": 1
+            }
+        },
+        {
+            "id": 27,
+            "name": "Lý do khác",
+            "description": "Tối đa 1 lần \/ Tháng",
+            "data": {
+                "is_calculate_salary": 1
+            }
+        }
+    ]
+}
+```

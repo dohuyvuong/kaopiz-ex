@@ -6,6 +6,8 @@ export interface TrackingTime {
   dateEnd?: string;
   timeStart?: string;
   timeEnd?: string;
+  /** Mốc giờ đơn checkin/out khai bổ sung — một điểm, không phải khoảng. */
+  time?: string;
   timeOff?: string | null;
   countHour?: number;
   reason?: string;
@@ -20,19 +22,38 @@ export interface ApplicationFormData {
     lastYear: number;
     thisYear: number;
   };
-  time?: string;
 }
 
 export interface ApplicationForm {
   id: number;
   userId: number;
-  typeId: number; // 1: Nghỉ phép, 2: Vắng mặt, 3: Check-in/out, 4: Check-out, ...
+  /**
+   * Loại đơn HRM:
+   * 1 Đơn xin nghỉ, 2 Đơn vắng mặt, 3 Đơn làm thêm,
+   * 4 Đơn checkin/out, 5 Đơn làm theo chế độ, 6 Đơn đổi ca
+   */
+  typeId: number;
   startDate: string | null; // ISO date string (ví dụ: "2025-10-16T00:00:00.000Z")
   endDate: string | null; // ISO date string (ví dụ: "2025-10-16T00:00:00.000Z")
   data: ApplicationFormData;
   createdAt: string | null; // ISO date string (ví dụ: "2025-10-16T08:30:00.000Z")
-  user?: unknown;
 }
+
+/**
+ * ID loại đơn theo API HRM `/master/all-types`.
+ *
+ * Cố ý KHÔNG có danh sách kiểu "loại nào ảnh hưởng chấm công". Việc một đơn có
+ * che được phút vi phạm hay không do khoảng thời gian của nó quyết định, không
+ * do loại đơn — xem `lib/timesheet/estimate.ts`.
+ */
+export const ApplicationFormTypeId = {
+  LEAVE: 1,
+  ABSENCE: 2,
+  OVERTIME: 3,
+  CHECK_IN_OUT: 4,
+  SPECIAL_REGIME: 5,
+  SHIFT_CHANGE: 6,
+} as const;
 
 export interface CreateTrackingTime {
   date?: string;

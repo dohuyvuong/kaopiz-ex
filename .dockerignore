@@ -1,0 +1,15 @@
+# Build context là gốc repo, nên phải loại trừ ở đây thay vì trong từng thư mục.
+**/node_modules
+**/dist
+**/.next
+**/coverage
+.git
+.github
+**/.env
+**/.env.*
+!**/.env.example
+**/*.log
+docs
+fixtures
+nginx
+**/*.db

@@ -1,23 +1,22 @@
 'use client';
 
-import { TimesheetDay } from '@/lib/types/timesheet';
+import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  Clock,
-  AlertCircle,
-  CheckCircle2,
-  Briefcase,
-  FileText,
-  Plus,
-  Trash2,
-  Loader2,
-} from 'lucide-react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { useTimesheetDayDetail } from '@/hooks/use-timesheet-day-detail';
-import { CreateApplicationFormDialog } from './CreateApplicationFormDialog';
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 import {
   Dialog,
   DialogContent,
@@ -26,496 +25,431 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useState, useMemo, useCallback, useEffect } from 'react';
-import { AxiosError } from 'axios';
-import { toast } from 'sonner';
+import { Briefcase, Clock, FileText, Loader2, Plus, Trash2 } from 'lucide-react';
 import { applicationApi } from '@/lib/api/application';
-
-interface TimesheetDayDetailData {
-  calendarDay?: TimesheetDay | null;
-  workingTime?: { workStart: string; workEnd: string } | null;
-  calendarDays?: Array<{ date: Date; timesheet: TimesheetDay | null }>;
-  mergedDays?: Map<string, TimesheetDay & { hasPendingForms?: boolean }>;
-  userId?: number;
-}
+import { extractErrorMessage } from '@/lib/api/error-message';
+import { CreateApplicationFormDialog } from './CreateApplicationFormDialog';
+import type {
+  CalendarDay,
+  DayEstimate,
+  DayForm,
+  TimesheetRules,
+} from '@kaopiz/timesheet';
+import type { TimesheetDayDetailResponse } from '@/lib/types/timesheet-day-detail';
 
 interface TimesheetDayDetailProps {
   date: string | null;
-  data?: TimesheetDayDetailData;
+  day: CalendarDay | null;
+  detail: TimesheetDayDetailResponse | null;
+  estimate: DayEstimate | null;
+  rules: TimesheetRules | null;
+  daysByDate: Map<string, CalendarDay>;
+  userId?: number;
+  today: string;
+  isLoading: boolean;
   onClose: () => void;
-  onApplicationFormCreated?: (date: string) => void;
-  isLoadingCalendar?: boolean;
+  /** Gọi sau khi tạo hoặc xoá đơn — panel không đóng, chỉ tải lại dữ liệu. */
+  onChanged: () => void;
+}
+
+function formatDateHeading(date: string): string {
+  return new Date(`${date}T00:00:00`).toLocaleDateString('vi-VN', {
+    weekday: 'long',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+}
+
+function formatPunchTime(iso: string | null): string {
+  if (!iso) return '--:--';
+  return new Date(iso).toLocaleTimeString('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
+
+/** Mô tả khoảng / mốc giờ của đơn thành một dòng đọc được. */
+function describeSchedule(form: DayForm): string {
+  const parts = form.intervals.map(
+    (interval) => `${interval.start} – ${interval.end}`,
+  );
+  parts.push(...form.punches.map((punch) => `bổ sung mốc ${punch}`));
+  return parts.join(', ') || 'Cả ngày';
+}
+
+function FormCard({
+  form,
+  onDelete,
+  isDeleting,
+}: {
+  form: DayForm;
+  onDelete: () => void;
+  isDeleting: boolean;
+}) {
+  return (
+    <div className="p-3 border rounded-md space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-semibold truncate">
+          {form.typeName ?? `Đơn loại ${form.typeId}`}
+        </span>
+        <div className="flex items-center gap-2 shrink-0">
+          <Badge
+            variant={form.isApproved ? 'outline' : 'secondary'}
+            className={
+              form.isApproved
+                ? ''
+                : 'bg-orange-100 text-orange-800 border-orange-300'
+            }
+          >
+            {form.isApproved ? 'Đã duyệt' : 'Chờ duyệt'}
+          </Badge>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-destructive hover:text-destructive"
+            disabled={isDeleting}
+            onClick={onDelete}
+            aria-label="Xoá đơn"
+          >
+            {isDeleting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Trash2 className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Clock className="h-3 w-3 shrink-0" />
+        <span>{describeSchedule(form)}</span>
+      </div>
+    </div>
+  );
+}
+
+function ViolationRow({
+  label,
+  actual,
+  covered,
+  estimated,
+}: {
+  label: string;
+  actual: number;
+  covered: number;
+  estimated: number;
+}) {
+  if (actual <= 0) return null;
+
+  return (
+    <div className="flex items-center gap-2 text-sm flex-wrap">
+      <Badge variant={covered > 0 ? 'secondary' : 'destructive'}>
+        {label}: {actual} phút
+      </Badge>
+      {covered > 0 && (
+        <span className="text-muted-foreground">
+          đơn chờ duyệt che <strong>{covered}</strong> phút, còn{' '}
+          <strong
+            className={estimated > 0 ? 'text-destructive' : 'text-green-600'}
+          >
+            {estimated}
+          </strong>{' '}
+          phút
+        </span>
+      )}
+    </div>
+  );
 }
 
 export function TimesheetDayDetail({
   date,
-  data,
+  day,
+  detail,
+  estimate,
+  rules,
+  daysByDate,
+  userId,
+  today,
+  isLoading,
   onClose,
-  onApplicationFormCreated,
-  isLoadingCalendar,
+  onChanged,
 }: TimesheetDayDetailProps) {
-  const calendarDay = data?.calendarDay;
-  const workingTime = data?.workingTime;
-  const calendarDays = data?.calendarDays;
-  const mergedDays = data?.mergedDays;
-  const userId = data?.userId;
-  const {
-    isLoading,
-    error,
-    day,
-    checkIn,
-    checkOut,
-    parseISODate,
-    formatDate,
-    formatDateTime,
-  } = useTimesheetDayDetail(date);
-  const [showCreateFormDialog, setShowCreateFormDialog] = useState(false);
-  const [deletingFormId, setDeletingFormId] = useState<number | null>(null);
-  const [deleteConfirmFormId, setDeleteConfirmFormId] = useState<number | null>(
-    null,
-  );
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   useEffect(() => {
-    setDeleteConfirmFormId(null);
+    setPendingDeleteId(null);
   }, [date]);
 
-  // Kiểm tra xem có đơn chưa approve (status !== 3) và là typeId 1 hoặc 2 cho ngày đó không
-  // Logic này giống với hasPendingForms trong calendar
-  const hasPendingForms = useMemo(() => {
-    // Kiểm tra từ day detail (tất cả đơn, bao gồm cả chưa approve)
-    const hasPending = day?.applicationForms?.some(
-      (form) => form.status !== 3 && (form.typeId === 1 || form.typeId === 2),
-    );
-
-    return hasPending || false;
-  }, [day]);
-
-  const handleCreateFormSuccess = async () => {
-    if (!date) return;
-    onClose();
-    onApplicationFormCreated?.(date);
-  };
-
-  const confirmDeleteApplicationForm = useCallback(async () => {
-    if (!date || deleteConfirmFormId === null) return;
-    const formId = deleteConfirmFormId;
-    setDeletingFormId(formId);
+  const confirmDelete = useCallback(async () => {
+    if (!date || pendingDeleteId == null) return;
+    setDeletingId(pendingDeleteId);
     try {
-      await applicationApi.deleteApplicationForms([formId]);
+      await applicationApi.deleteApplicationForms([pendingDeleteId]);
       toast.success('Đã xoá đơn từ');
-      setDeleteConfirmFormId(null);
-      onClose();
-      onApplicationFormCreated?.(date);
+      setPendingDeleteId(null);
+      onChanged();
     } catch (err) {
-      const payload = err instanceof AxiosError ? err.response?.data : null;
-      const msg =
-        payload &&
-        typeof payload === 'object' &&
-        'message' in payload &&
-        typeof (payload as { message: unknown }).message === 'string'
-          ? (payload as { message: string }).message
-          : err instanceof Error
-            ? err.message
-            : 'Không xoá được đơn từ';
-      toast.error(msg);
+      // Hiển thị nguyên văn lỗi HRM — nó biết lý do từ chối, ta thì không.
+      toast.error(extractErrorMessage(err, 'Không xoá được đơn từ'));
     } finally {
-      setDeletingFormId(null);
+      setDeletingId(null);
     }
-  }, [date, deleteConfirmFormId, onApplicationFormCreated, onClose]);
+  }, [date, pendingDeleteId, onChanged]);
 
   if (!date) return null;
 
-  const isDeleteBusy =
-    deleteConfirmFormId !== null && deletingFormId === deleteConfirmFormId;
+  const isDeleteBusy = pendingDeleteId != null && deletingId === pendingDeleteId;
+  const punches = detail?.timeSheets ?? [];
+  const hasViolation =
+    (estimate?.actual.minutesLate ?? 0) > 0 ||
+    (estimate?.actual.minutesEarly ?? 0) > 0;
 
   return (
     <>
-    <Sheet open={!!date} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>Chi tiết chấm công - {formatDate(date)}</SheetTitle>
-        </SheetHeader>
+      <Sheet open onOpenChange={(open) => !open && onClose()}>
+        <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>
+              Chi tiết chấm công — {formatDateHeading(date)}
+            </SheetTitle>
+          </SheetHeader>
 
-        {(isLoading || isLoadingCalendar) && (
-          <div className="flex items-center justify-center h-64">
-            <div className="text-muted-foreground">Đang tải...</div>
-          </div>
-        )}
-
-        {error && (
-          <div className="flex items-center justify-center h-64 text-destructive">
-            <AlertCircle className="h-5 w-5 mr-2" />
-            {error}
-          </div>
-        )}
-
-        {day && !isLoading && !isLoadingCalendar && (
-          <div className="space-y-4 p-4">
-            {/* Thông tin check-in/check-out */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Thông tin chấm công</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <div className="text-sm text-muted-foreground">Check-in</div>
-                    <div className="text-lg font-semibold">
-                      {checkIn ? formatDateTime(checkIn) : (
-                        <span className="text-muted-foreground">Chưa check-in</span>
-                      )}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground">Check-out</div>
-                    <div className="text-lg font-semibold">
-                      {checkOut ? formatDateTime(checkOut) : (
-                        <span className="text-muted-foreground">Chưa check-out</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Thông tin đi muộn/về sớm */}
-                {calendarDay && (calendarDay.minutesLate > 0 || calendarDay.minutesEarly > 0) && (
-                  <div className="pt-2 border-t">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="text-sm text-muted-foreground">Đi muộn/Về sớm:</div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowCreateFormDialog(true)}
-                        className="h-7 text-xs"
-                      >
-                        <Plus className="h-3 w-3 mr-1" />
-                        Tạo đơn
-                      </Button>
-                    </div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {calendarDay.minutesLate > 0 && (
-                        <Badge
-                          variant={hasPendingForms ? 'secondary' : 'destructive'}
-                          className={`text-sm ${
-                            hasPendingForms
-                              ? 'bg-orange-100 text-orange-800 border-orange-300'
-                              : ''
-                          }`}
-                        >
-                          Đi muộn: {calendarDay.minutesLate} phút
-                        </Badge>
-                      )}
-                      {calendarDay.minutesEarly > 0 && (
-                        <Badge
-                          variant={hasPendingForms ? 'secondary' : 'destructive'}
-                          className={`text-sm ${
-                            hasPendingForms
-                              ? 'bg-orange-100 text-orange-800 border-orange-300'
-                              : ''
-                          }`}
-                        >
-                          Về sớm: {calendarDay.minutesEarly} phút
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Danh sách tất cả các lần chấm công */}
-                {day.timeSheets && day.timeSheets.length > 0 && (
-                  <div className="pt-2 border-t">
-                    <Accordion type="single" collapsible className="w-full">
-                      <AccordionItem value="timeSheets" className="border-none">
-                        <AccordionTrigger className="text-sm text-muted-foreground py-2 hover:no-underline">
-                          Tất cả các lần chấm công:
-                        </AccordionTrigger>
-                        <AccordionContent>
-                          <div className="space-y-1">
-                            {day.timeSheets.map((record, index) => (
-                              <div key={record.id || index} className="flex items-center justify-between text-sm">
-                                <div className="flex items-center gap-2">
-                                  <Clock className="h-3 w-3" />
-                                  <span>{record.time ? formatDateTime(record.time) : 'N/A'}</span>
-                                </div>
-                                <Badge variant="outline" className="text-xs">
-                                  {record.machineCode}
-                                </Badge>
-                              </div>
-                            ))}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    </Accordion>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Work log từ calendar */}
-            {calendarDay?.logWork && (
+          {isLoading ? (
+            <div className="flex items-center justify-center h-64 text-muted-foreground">
+              Đang tải...
+            </div>
+          ) : (
+            <div className="space-y-4 p-4">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Briefcase className="h-5 w-5" />
-                    Work log
-                  </CardTitle>
+                  <CardTitle className="text-lg">Thông tin chấm công</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <span className="text-sm text-muted-foreground">Thời gian làm việc: </span>
-                      <span className="font-semibold">{calendarDay.logWork.timeSpentHour} giờ</span>
+                      <div className="text-sm text-muted-foreground">
+                        Giờ vào
+                      </div>
+                      <div className="text-lg font-semibold">
+                        {day?.timeIn ?? (
+                          <span className="text-muted-foreground text-base">
+                            Chưa chấm công
+                          </span>
+                        )}
+                      </div>
+                      {day?.timeInFinal && day.timeInFinal !== day.timeIn && (
+                        <div className="text-xs text-muted-foreground">
+                          Sau khi áp đơn: {day.timeInFinal}
+                        </div>
+                      )}
                     </div>
-                    {calendarDay.logWorkDiff !== 0 && (
+                    <div>
+                      <div className="text-sm text-muted-foreground">Giờ ra</div>
+                      <div className="text-lg font-semibold">
+                        {day?.timeOut ?? (
+                          <span className="text-muted-foreground text-base">
+                            Chưa chấm công
+                          </span>
+                        )}
+                      </div>
+                      {day?.timeOutFinal && day.timeOutFinal !== day.timeOut && (
+                        <div className="text-xs text-muted-foreground">
+                          Sau khi áp đơn: {day.timeOutFinal}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {estimate && hasViolation && (
+                    <div className="pt-2 border-t space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">
+                          Đi muộn / về sớm
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowCreateDialog(true)}
+                          className="h-7 text-xs"
+                        >
+                          <Plus className="h-3 w-3 mr-1" />
+                          Tạo đơn
+                        </Button>
+                      </div>
+                      <ViolationRow
+                        label="Đi muộn"
+                        actual={estimate.actual.minutesLate}
+                        covered={estimate.covered.minutesLate}
+                        estimated={estimate.estimated.minutesLate}
+                      />
+                      <ViolationRow
+                        label="Về sớm"
+                        actual={estimate.actual.minutesEarly}
+                        covered={estimate.covered.minutesEarly}
+                        estimated={estimate.estimated.minutesEarly}
+                      />
+                    </div>
+                  )}
+
+                  {punches.length > 0 && (
+                    <div className="pt-2 border-t">
+                      <Accordion type="single" collapsible>
+                        <AccordionItem value="punches" className="border-none">
+                          <AccordionTrigger className="text-sm text-muted-foreground py-2 hover:no-underline">
+                            {punches.length} lần quẹt máy
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <div className="space-y-1">
+                              {punches.map((punch) => (
+                                <div
+                                  key={punch.id}
+                                  className="flex items-center justify-between text-sm"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <Clock className="h-3 w-3" />
+                                    <span>{formatPunchTime(punch.time)}</span>
+                                  </div>
+                                  <Badge variant="outline" className="text-xs">
+                                    {punch.machineCode}
+                                  </Badge>
+                                </div>
+                              ))}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      </Accordion>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {day?.logWork && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Briefcase className="h-5 w-5" />
+                      Work log
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <div>
+                      Đã log:{' '}
+                      <span className="font-semibold">
+                        {day.logWork.hours} giờ
+                      </span>
+                    </div>
+                    {day.logWork.diff !== 0 && (
                       <div>
-                        <span className="text-sm text-muted-foreground">Chênh lệch: </span>
-                        <span className={calendarDay.logWorkDiff > 0 ? 'text-green-600 font-semibold' : 'text-destructive font-semibold'}>
-                          {calendarDay.logWorkDiff > 0 ? '+' : ''}
-                          {calendarDay.logWorkDiff.toFixed(2)} giờ
+                        Chênh lệch:{' '}
+                        <span
+                          className={
+                            day.logWork.diff > 0
+                              ? 'text-green-600 font-semibold'
+                              : 'text-destructive font-semibold'
+                          }
+                        >
+                          {day.logWork.diff > 0 ? '+' : ''}
+                          {day.logWork.diff.toFixed(2)} giờ
                         </span>
                       </div>
                     )}
-                    {calendarDay.logWorkNeeded > 0 && (
-                      <div>
-                        <span className="text-sm text-muted-foreground">Cần log: </span>
-                        <span className="font-semibold">{calendarDay.logWorkNeeded} giờ</span>
-                      </div>
-                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Một danh sách đơn duy nhất — đã duyệt và chờ duyệt cùng chỗ. */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <FileText className="h-5 w-5" />
+                      Đơn từ
+                    </CardTitle>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowCreateDialog(true)}
+                      className="h-8 text-xs"
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Tạo đơn
+                    </Button>
                   </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {day && day.forms.length > 0 ? (
+                    day.forms.map((form) => (
+                      <FormCard
+                        key={form.id}
+                        form={form}
+                        isDeleting={deletingId === form.id}
+                        onDelete={() => setPendingDeleteId(form.id)}
+                      />
+                    ))
+                  ) : (
+                    <div className="text-center py-4 text-sm text-muted-foreground">
+                      Chưa có đơn từ nào
+                    </div>
+                  )}
                 </CardContent>
               </Card>
-            )}
+            </div>
+          )}
 
-            {/* Các đơn */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
-                    Đơn
-                  </CardTitle>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowCreateFormDialog(true)}
-                    className="h-8 text-xs"
-                  >
-                    <Plus className="h-3 w-3 mr-1" />
-                    Tạo đơn
-                  </Button>
-                </div>
-              </CardHeader>
-              {(day.applicationForms && day.applicationForms.length > 0) || (calendarDay?.approvedApplicationForms && calendarDay.approvedApplicationForms.length > 0) ? (
-                <CardContent className="space-y-3">
-                  {/* Đơn từ day detail API */}
-                  {day.applicationForms && day.applicationForms.map((form, index) => (
-                    <div
-                      key={form.id || index}
-                      className="p-3 border rounded-md space-y-2"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
-                          <span className="font-semibold truncate">
-                            {form.type.name}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <Badge variant="outline">
-                            {form.status === 3 ? 'Đã duyệt' : form.status === 1 ? 'Chờ duyệt' : form.status === 2 ? 'Chờ duyệt (bước 2)' : `Status ${form.status}`}
-                          </Badge>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                            disabled={deletingFormId === form.id}
-                            onClick={() => setDeleteConfirmFormId(form.id)}
-                            aria-label="Xoá đơn"
-                          >
-                            {deletingFormId === form.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                      {form.data.trackingTimes && form.data.trackingTimes.length > 0 && (
-                        <div className="text-sm text-muted-foreground space-y-1">
-                          {form.data.trackingTimes.map((track, trackIndex) => (
-                            <div key={trackIndex} className="flex items-center gap-2">
-                              <Clock className="h-3 w-3" />
-                              {track.timeStart && track.timeEnd && (
-                                <span>
-                                  {track.timeStart} - {track.timeEnd}
-                                </span>
-                              )}
-                              {track.date && (
-                                <span className="text-foreground">
-                                  ({parseISODate(track.date)?.format('DD/MM/YYYY') || track.date})
-                                </span>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {form.startDate && form.endDate && (
-                        <div className="text-xs text-muted-foreground">
-                          Thời gian: {parseISODate(form.startDate)?.format('DD/MM/YYYY') || form.startDate}
-                          {(() => {
-                            const start = parseISODate(form.startDate);
-                            const end = parseISODate(form.endDate);
-                            if (!start || !end || start.isSame(end, 'day')) return null;
-                            return <> - {end.format('DD/MM/YYYY')}</>;
-                          })()}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  {/* Đơn từ calendar (nếu không có trong day detail) */}
-                  {calendarDay?.approvedApplicationForms && calendarDay.approvedApplicationForms.map((form, index) => {
-                    // Chỉ hiển thị nếu không có trong day.applicationForms
-                    const existsInDetail = day.applicationForms?.some(f => f.id === form.id);
-                    if (existsInDetail) return null;
+          <CreateApplicationFormDialog
+            open={showCreateDialog}
+            onOpenChange={setShowCreateDialog}
+            date={date}
+            day={day}
+            rules={rules}
+            daysByDate={daysByDate}
+            userId={userId}
+            today={today}
+            onCreated={() => {
+              setShowCreateDialog(false);
+              onChanged();
+            }}
+          />
+        </SheetContent>
+      </Sheet>
 
-                    return (
-                      <div
-                        key={form.id || index}
-                        className="p-3 border rounded-md space-y-2"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
-                            <span className="font-semibold truncate">
-                              {form.typeId === 1 ? 'Nghỉ phép' : form.typeId === 2 ? 'Vắng mặt' : form.typeId === 3 ? 'Check-in/out' : `Loại ${form.typeId}`}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <Badge variant="outline">Đã duyệt</Badge>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive"
-                              disabled={deletingFormId === form.id}
-                              onClick={() => setDeleteConfirmFormId(form.id)}
-                              aria-label="Xoá đơn"
-                            >
-                              {deletingFormId === form.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Trash2 className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </div>
-                        </div>
-                        {form.data?.trackingTimes && form.data.trackingTimes.length > 0 && (
-                          <div className="text-sm text-muted-foreground space-y-1">
-                            {form.data.trackingTimes.map((track, trackIndex) => (
-                              <div key={trackIndex} className="flex items-center gap-2">
-                                <Clock className="h-3 w-3" />
-                                {track.timeStart && track.timeEnd && (
-                                  <span>
-                                    {track.timeStart} - {track.timeEnd}
-                                  </span>
-                                )}
-                                {track.reason && (
-                                  <span className="text-foreground">({track.reason})</span>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {form.startDate && form.endDate && (
-                          <div className="text-xs text-muted-foreground">
-                            Thời gian: {parseISODate(form.startDate)?.format('DD/MM/YYYY') || form.startDate}
-                            {(() => {
-                              const start = parseISODate(form.startDate);
-                              const end = parseISODate(form.endDate);
-                              if (!start || !end || start.isSame(end, 'day')) return null;
-                              return <> - {end.format('DD/MM/YYYY')}</>;
-                            })()}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </CardContent>
-              ) : (
-                <CardContent>
-                  <div className="text-center py-4 text-sm text-muted-foreground">
-                    Chưa có đơn từ nào
-                  </div>
-                </CardContent>
-              )}
-            </Card>
-          </div>
-        )}
-
-        {/* Create Application Form Dialog */}
-        <CreateApplicationFormDialog
-          open={showCreateFormDialog}
-          onOpenChange={setShowCreateFormDialog}
-          data={{
-            date: date,
-            calendarDay,
-            workingTime,
-            calendarDays,
-            mergedDays,
-            dayDetail: day ? { applicationForms: day.applicationForms } : null,
-            userId,
-          }}
-          onSuccess={handleCreateFormSuccess}
-        />
-      </SheetContent>
-    </Sheet>
-
-    <Dialog
-      open={deleteConfirmFormId !== null}
-      onOpenChange={(open) => {
-        if (!open && !isDeleteBusy) setDeleteConfirmFormId(null);
-      }}
-    >
-      <DialogContent
-        showCloseButton={!isDeleteBusy}
-        className="sm:max-w-md"
-        onPointerDownOutside={(e) => {
-          if (isDeleteBusy) e.preventDefault();
-        }}
-        onEscapeKeyDown={(e) => {
-          if (isDeleteBusy) e.preventDefault();
+      <Dialog
+        open={pendingDeleteId != null}
+        onOpenChange={(open) => {
+          if (!open && !isDeleteBusy) setPendingDeleteId(null);
         }}
       >
-        <DialogHeader>
-          <DialogTitle>Xoá đơn từ?</DialogTitle>
-          <DialogDescription>
-            Hành động này không thể hoàn tác trên giao diện này. Hệ thống HRM có thể
-            từ chối nếu đơn không đủ điều kiện xoá.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setDeleteConfirmFormId(null)}
-            disabled={isDeleteBusy}
-          >
-            Huỷ
-          </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={() => void confirmDeleteApplicationForm()}
-            disabled={isDeleteBusy}
-          >
-            {isDeleteBusy ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : null}
-            Xoá đơn
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        <DialogContent showCloseButton={!isDeleteBusy} className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Xoá đơn từ?</DialogTitle>
+            <DialogDescription>
+              Hành động này không hoàn tác được từ đây. HRM có thể từ chối nếu đơn
+              không đủ điều kiện xoá.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setPendingDeleteId(null)}
+              disabled={isDeleteBusy}
+            >
+              Huỷ
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => void confirmDelete()}
+              disabled={isDeleteBusy}
+            >
+              {isDeleteBusy && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+              Xoá đơn
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

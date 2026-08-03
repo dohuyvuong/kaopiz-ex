@@ -1,8 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import { SuggestedForm, suggestForms } from '@kaopiz/timesheet';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SystemTokenService } from '../../auth/services/system-token.service';
-import { TimesheetService } from '../../timesheet/timesheet.service';
+import { TimesheetSnapshotService } from '../../timesheet/timesheet-snapshot.service';
 import { NotificationService } from '../../notification/services/notification.service';
 import { AppConfigService } from '../../config/config.service';
 import { UserWithValidToken } from '../../auth/interfaces/automation-user.interface';
@@ -10,14 +11,14 @@ import {
   JobType,
   PendingActionStatus,
 } from '../../automation/constants/automation.constants';
-import { TimesheetDayDto } from '../../timesheet/dto/timesheet-calendar.dto';
-import dayjs from 'dayjs';
+import { FormCreationPayload } from '../../automation/interfaces/pending-action-payload.interface';
 
-interface AutoCreateDayCandidate {
-  date: string;
-  data: TimesheetDayDto;
-}
-
+/**
+ * Cron đề xuất đơn cần tạo để tổng đi muộn / về sớm của tháng không vượt hạn mức.
+ *
+ * Dùng đúng hàm `suggestForms` mà nút "Tự động tạo đơn" trên giao diện dùng
+ * (package `@kaopiz/timesheet`), nên hai nơi luôn đề xuất giống nhau.
+ */
 @Injectable()
 export class TimesheetSchedulerService {
   private readonly logger = new Logger(TimesheetSchedulerService.name);
@@ -25,21 +26,16 @@ export class TimesheetSchedulerService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly systemTokenService: SystemTokenService,
-    private readonly timesheetService: TimesheetService,
+    private readonly snapshotService: TimesheetSnapshotService,
     private readonly notificationService: NotificationService,
     private readonly configService: AppConfigService,
   ) {}
 
-  /**
-   * Cron job: Tự động kiểm tra timesheet và tạo đơn
-   * Chạy vào 10h sáng hàng ngày (có thể điều chỉnh)
-   */
-  @Cron('0 10 * * *') // 10:00 AM every day
+  @Cron('0 10 * * *') // 10:00 hàng ngày
   async handleAutoCreateForms() {
     this.logger.log('Running auto-create forms cron job...');
 
     try {
-      // Get users with automation enabled for auto-create-forms
       const { usersWithValidToken, usersWithInvalidToken } =
         await this.systemTokenService.getUsersWithAutomationEnabled(
           JobType.AUTO_CREATE_FORMS,
@@ -49,7 +45,6 @@ export class TimesheetSchedulerService {
         `Found ${usersWithValidToken.length} users with valid token and ${usersWithInvalidToken.length} users with invalid token`,
       );
 
-      // Send notification to users with invalid token
       for (const userInfo of usersWithInvalidToken) {
         try {
           if (
@@ -70,10 +65,9 @@ export class TimesheetSchedulerService {
         }
       }
 
-      // Process users with valid token
       for (const userInfo of usersWithValidToken) {
         try {
-          await this.processUserFormCreation(userInfo);
+          await this.processUser(userInfo);
         } catch (error) {
           this.logger.error(
             `Failed to process form creation for user ${userInfo.userId}:`,
@@ -88,69 +82,76 @@ export class TimesheetSchedulerService {
     }
   }
 
-  /**
-   * Process form creation for a single user
-   */
-  private async processUserFormCreation(userInfo: UserWithValidToken) {
-    const { userId, token, setting } = userInfo;
-    const params = setting.params as { lookbackDays?: number };
-    const lookbackDays = params.lookbackDays || 7;
+  private async processUser(userInfo: UserWithValidToken) {
+    const { userId, token } = userInfo;
 
-    this.logger.log(
-      `Processing form creation for user ${userId} (lookbackDays: ${lookbackDays})`,
-    );
+    const today = new Date();
+    const todayKey = toDateKey(today);
 
-    // Calculate months to check (current month and previous month if lookbackDays > 7)
-    // HRM API month_year format: "MM-YYYY" (ví dụ: "01-2026", "10-2025")
-    const today = dayjs();
-    const monthsToCheck = new Set<string>();
-    monthsToCheck.add(today.format('MM-YYYY')); // Current month
+    // Vi phạm được tính theo THÁNG nên phải xét trọn tháng, không phải N ngày
+    // gần đây. Đầu tháng thì tháng trước vẫn còn trong hạn nộp đơn nên xét cả hai.
+    const monthsToCheck = new Set<string>([toMonthYear(today)]);
+    const lastMonth = new Date(today);
+    lastMonth.setMonth(lastMonth.getMonth() - 1);
+    if (today.getDate() <= 10) monthsToCheck.add(toMonthYear(lastMonth));
 
-    // If lookbackDays goes into previous month, add it
-    const oldestDate = today.subtract(lookbackDays, 'day');
-    if (oldestDate.month() !== today.month()) {
-      monthsToCheck.add(oldestDate.format('MM-YYYY'));
-    }
-
-    // Get timesheet data for all months
-    const allDaysNeedingForms: AutoCreateDayCandidate[] = [];
     for (const monthYear of monthsToCheck) {
       try {
-        const calendar = await this.timesheetService.getCalendar(
-          token,
-          monthYear,
-        );
+        const snapshot = await this.snapshotService.build(token, monthYear);
+        const suggestion = suggestForms({
+          days: snapshot.days,
+          rules: snapshot.rules,
+          actualTotal: snapshot.actualTotal,
+          today: todayKey,
+        });
 
-        // Find days that need forms (missing hours, etc.)
-        for (const [dateStr, dayData] of Object.entries(calendar)) {
-          // Check if date is within lookback range
-          const dayDate = dayjs(dateStr);
-          const daysAgo = today.diff(dayDate, 'day');
-
-          if (daysAgo > 0 && daysAgo <= lookbackDays) {
-            if (this.isDayNeedingForm(dayData)) {
-              allDaysNeedingForms.push({
-                date: dateStr,
-                data: dayData,
-              });
-            }
-          }
+        if (suggestion.forms.length === 0) {
+          this.logger.log(
+            `User ${userId} tháng ${monthYear}: không cần tạo đơn ` +
+              `(tổng ${suggestion.currentTotal}/${suggestion.allowedTotal} phút)`,
+          );
+          continue;
         }
+
+        await this.createPendingAction(userInfo, monthYear, suggestion);
       } catch (error) {
-        this.logger.error(`Failed to get calendar for ${monthYear}:`, error);
+        this.logger.error(
+          `Failed to build suggestions for user ${userId}, month ${monthYear}:`,
+          error,
+        );
       }
     }
+  }
 
-    if (allDaysNeedingForms.length === 0) {
-      this.logger.log(`No days needing forms for user ${userId}`);
+  private async createPendingAction(
+    userInfo: UserWithValidToken,
+    monthYear: string,
+    suggestion: { forms: SuggestedForm[]; coveredMinutes: number },
+  ) {
+    const { userId, setting } = userInfo;
+
+    // Đã có đề xuất chờ xử lý cho tháng này thì không gửi lại — cron chạy hằng
+    // ngày, không chặn thì mỗi ngày một thông báo trùng.
+    const existing = await this.prisma.pendingAction.findFirst({
+      where: {
+        userId,
+        jobType: JobType.AUTO_CREATE_FORMS,
+        status: PendingActionStatus.PENDING,
+      },
+    });
+    if (existing) {
+      this.logger.log(
+        `User ${userId} đã có pending action ${existing.id}, bỏ qua tháng ${monthYear}`,
+      );
       return;
     }
 
-    this.logger.log(
-      `Found ${allDaysNeedingForms.length} days needing forms for user ${userId}`,
-    );
+    const payload: FormCreationPayload = {
+      forms: suggestion.forms,
+      monthYear,
+      coveredMinutes: suggestion.coveredMinutes,
+    };
 
-    // Create PendingAction
     const expiresAt = new Date();
     expiresAt.setMinutes(
       expiresAt.getMinutes() + setting.autoApproveAfterMinutes,
@@ -160,94 +161,62 @@ export class TimesheetSchedulerService {
       data: {
         userId,
         jobType: JobType.AUTO_CREATE_FORMS,
-        payload: JSON.stringify({
-          days: allDaysNeedingForms,
-          lookbackDays,
-        }),
+        payload: JSON.stringify(payload),
         status: PendingActionStatus.PENDING,
         expiresAt,
       },
     });
 
     this.logger.log(
-      `Created pending action ${pendingAction.id} for user ${userId}`,
+      `Created pending action ${pendingAction.id} for user ${userId} ` +
+        `(${suggestion.forms.length} đơn, ${suggestion.coveredMinutes} phút)`,
     );
 
-    // Send notification (với nút Duyệt / Từ chối trên Telegram)
     const config = this.configService.getConfig();
-    const approveUrl = `${config.appUrl}/automation/approve/${pendingAction.id}`;
-    const rejectUrl = `${config.appUrl}/automation/reject/${pendingAction.id}`;
-
     await this.notificationService.sendPendingActionNotification(
       setting.notificationChannel,
       setting.notificationTarget,
       JobType.AUTO_CREATE_FORMS,
-      allDaysNeedingForms.length,
+      suggestion.forms.length,
       setting.autoApproveAfterMinutes,
-      approveUrl,
-      rejectUrl,
-      this.buildAutoCreateFormsDetail(allDaysNeedingForms),
+      `${config.appUrl}/automation/approve/${pendingAction.id}`,
+      `${config.appUrl}/automation/reject/${pendingAction.id}`,
+      buildDetail(monthYear, suggestion.forms),
     );
+  }
+}
 
-    this.logger.log(`Sent notification to user ${userId}`);
+/** "YYYY-MM-DD" theo giờ địa phương của server. */
+function toDateKey(date: Date): string {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('-');
+}
+
+/** "MM-YYYY" — định dạng HRM dùng cho tham số tháng. */
+function toMonthYear(date: Date): string {
+  return `${String(date.getMonth() + 1).padStart(2, '0')}-${date.getFullYear()}`;
+}
+
+function buildDetail(monthYear: string, forms: SuggestedForm[]): string {
+  const MAX_LINES = 8;
+  const lines = forms.slice(0, MAX_LINES).map((form) => {
+    const kind = form.usesAnnualLeave ? 'nghỉ phép' : 'vắng mặt';
+    const covers = form.covers === 'late' ? 'đi muộn' : 'về sớm';
+    return `• ${form.date}: ${kind} ${form.timeStart}–${form.timeEnd} (${form.minutes}p, che ${covers})`;
+  });
+
+  const remaining = forms.length - MAX_LINES;
+  if (remaining > 0) lines.push(`• ...và ${remaining} đơn khác`);
+
+  const annualLeave = forms
+    .filter((form) => form.usesAnnualLeave)
+    .reduce((sum, form) => sum + form.minutes, 0);
+  if (annualLeave > 0) {
+    lines.push(`\n<i>Trong đó ${annualLeave} phút dùng phép năm.</i>`);
   }
 
-  /**
-   * Check if a day needs a form
-   * (Simple logic - can be enhanced based on business rules)
-   */
-  private isDayNeedingForm(dayData: TimesheetDayDto): boolean {
-    // Skip weekends (workDays = 0 for weekends)
-    if (!dayData.workDays || dayData.workDays === 0) {
-      return false;
-    }
-
-    // If already has approved application forms, no need for new form
-    if (
-      dayData.approvedApplicationForms &&
-      dayData.approvedApplicationForms.length > 0
-    ) {
-      return false;
-    }
-
-    // Check if day has issues: late, early, or insufficient hours
-    const hasIssues =
-      dayData.minutesLate > 0 ||
-      dayData.minutesEarly > 0 ||
-      (dayData.workHours < 8 && dayData.workHours > 0); // Less than 8 hours but worked
-
-    return hasIssues;
-  }
-
-  /**
-   * Build notification details for auto-create forms.
-   * Show a compact list of days and basic issue summary.
-   */
-  private buildAutoCreateFormsDetail(days: AutoCreateDayCandidate[]): string {
-    const maxLines = 8;
-    const detailLines = days.slice(0, maxLines).map(({ date, data }) => {
-      const basicIssues: string[] = [];
-
-      if (data.minutesLate > 0) {
-        basicIssues.push(`đi muộn ${data.minutesLate}p`);
-      }
-      if (data.minutesEarly > 0) {
-        basicIssues.push(`về sớm ${data.minutesEarly}p`);
-      }
-      if (data.workHours > 0 && data.workHours < 8) {
-        basicIssues.push(`làm ${data.workHours}h`);
-      }
-
-      const issueSummary =
-        basicIssues.length > 0 ? basicIssues.join(', ') : 'cần tạo đơn';
-      return `• ${dayjs(date).format('DD/MM/YYYY')}: ${issueSummary}`;
-    });
-
-    const remainingCount = days.length - maxLines;
-    if (remainingCount > 0) {
-      detailLines.push(`• ...và ${remainingCount} ngày khác`);
-    }
-
-    return `<b>Danh sách đơn cần tạo:</b>\n${detailLines.join('\n')}`;
-  }
+  return `<b>Đơn đề xuất cho tháng ${monthYear}:</b>\n${lines.join('\n')}`;
 }
