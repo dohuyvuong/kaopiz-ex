@@ -4,23 +4,33 @@
 
 HRM phạt theo **tổng đi muộn + về sớm của cả tháng**, có hạn mức miễn phạt (`workingTime.minutesEarlyLateAllowed`, hiện là 90 phút). Vượt hạn mức thì bị phạt tiền.
 
-Mục tiêu: tạo vừa đủ đơn để kéo tổng về dưới hạn mức, với **chi phí thấp nhất cho người dùng**.
+Mục tiêu: giữ tổng dưới hạn mức với **chi phí thấp nhất cho người dùng** — tận
+dụng hết thứ miễn phí trước, chỉ tiêu phép năm cho phần bắt buộc.
 
 ## Thứ tự ưu tiên theo chi phí
 
 **1. Đơn vắng mặt — lý do 21 "Thay đổi thời gian làm việc"**
 
-Không tốn phép năm. Nhưng bị HRM giới hạn, và giới hạn đọc từ `/master/all-reasons`:
+Không tốn phép năm. Giới hạn đọc từ `/master/all-reasons`:
 
-- `maxTimesInWeek: 2` — tối đa 2 lần mỗi tuần (thứ Hai → Chủ nhật)
-- `maxMinutesInDay: 60` — tối đa 60 phút mỗi lần
+- `maxTimesInWeek: 2` — 2 lần mỗi tuần (thứ Hai → Chủ nhật)
+- `maxMinutesInDay: 60` — 60 phút mỗi ngày
 - Ngày đó phải đủ giờ làm
+
+Đây là **quyền lợi cấp theo tuần và hết hạn**, không phải trần cần né. Không dùng
+là mất: hạn nộp đơn chỉ vài ngày nên quota của tuần đã qua không lấy lại được.
+Vì vậy thuật toán **dùng tối đa quota mỗi tuần**, kể cả khi tháng chưa vượt hạn
+mức phạt — phần dư ra là đệm cho những ngày đi muộn phát sinh về sau.
 
 **2. Đơn xin nghỉ — lý do 4 "Nghỉ phép năm"**
 
-Không giới hạn số lần nhưng **tốn phép năm**. Chỉ dùng cho phần đơn vắng mặt không gánh nổi.
+Không giới hạn số lần nhưng **tốn phép năm**. Ngược với vòng 1: chỉ tạo **đúng
+phần còn vượt hạn mức** sau khi đã trừ đơn vắng mặt, không tiêu trước phòng xa.
 
-Thuật toán **dừng ngay khi đủ che phần vượt hạn mức** — mỗi đơn đều tốn công người duyệt, không tạo thừa.
+> Từng có lúc thuật toán dừng cả hai vòng ngay khi đủ che phần vượt, với lý do
+> "mỗi đơn đều tốn công người duyệt". Đó là đánh đổi sai: công người duyệt là chi
+> phí tưởng tượng, còn quota tuần bị bỏ phí là mất mát có thật, quy ra phép năm
+> phải tiêu ở những tháng sau.
 
 ## Điều kiện đủ giờ làm
 
@@ -62,6 +72,16 @@ Tổng che 25 phút → tháng vừa đúng 90, hết bị phạt.
 
 Ví dụ này cho thấy vì sao "chọn ngày vi phạm nặng nhất" không đủ: quota tuần và điều kiện giờ làm mới là thứ quyết định.
 
+## Ví dụ tháng chưa vượt hạn mức — 04/2026
+
+Tổng 79 phút < 90, **không bị phạt**, nên không cần đơn nghỉ phép nào. Nhưng tuần
+30/03–05/04 mới dùng 1/2 quota đơn vắng mặt, và ngày 01/04 muộn 20 phút với giờ
+làm đủ điều kiện.
+
+→ Vẫn tạo 1 đơn vắng mặt 20 phút. Tổng tháng xuống **59 phút**, dôi ra 31 phút đệm
+cho nửa tháng còn lại. Nếu bỏ qua, quota tuần đó mất hẳn và 20 phút này sẽ chiếm
+chỗ trong hạn mức của cả tháng.
+
 ## Hai nơi dùng, một logic
 
 | Nơi | Kích hoạt | Đường đi |
@@ -87,6 +107,7 @@ cron 10:00
 Vài điểm đáng lưu ý:
 
 - **Quét trọn tháng, không phải N ngày gần đây.** Vi phạm tính theo tháng nên "7 ngày gần đây" không trả lời được câu "tháng này có vượt hạn mức không". Trước ngày 10 thì quét cả tháng trước, vì tháng trước vẫn còn trong hạn nộp đơn.
+- **Chạy hằng ngày là cố ý.** Quota đơn vắng mặt hết hạn theo tuần, nên phải nhắc sớm — đợi tới cuối tháng thì quota các tuần đầu đã mất.
 - **Chống gửi trùng.** Cron chạy hằng ngày; đã có pending action chờ xử lý thì bỏ qua.
 - **Người duyệt tra lúc thực thi**, không lưu trong payload — từ lúc gửi thông báo tới lúc bấm duyệt có thể vài giờ, đủ để người dùng đổi lựa chọn.
 - Một đơn lỗi không chặn các đơn còn lại; hỏng toàn bộ thì ném lỗi thay vì im lặng.

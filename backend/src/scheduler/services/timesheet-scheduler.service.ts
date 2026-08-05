@@ -107,8 +107,9 @@ export class TimesheetSchedulerService {
 
         if (suggestion.forms.length === 0) {
           this.logger.log(
-            `User ${userId} tháng ${monthYear}: không cần tạo đơn ` +
-              `(tổng ${suggestion.currentTotal}/${suggestion.allowedTotal} phút)`,
+            `User ${userId} tháng ${monthYear}: không có gì để tạo ` +
+              `(tổng ${suggestion.currentTotal}/${suggestion.allowedTotal} phút, ` +
+              `hết quota đơn vắng mặt hoặc không còn ngày hợp lệ)`,
           );
           continue;
         }
@@ -126,7 +127,14 @@ export class TimesheetSchedulerService {
   private async createPendingAction(
     userInfo: UserWithValidToken,
     monthYear: string,
-    suggestion: { forms: SuggestedForm[]; coveredMinutes: number },
+    suggestion: {
+      forms: SuggestedForm[];
+      coveredMinutes: number;
+      absenceMinutes: number;
+      leaveMinutes: number;
+      projectedTotal: number;
+      allowedTotal: number;
+    },
   ) {
     const { userId, setting } = userInfo;
 
@@ -169,7 +177,9 @@ export class TimesheetSchedulerService {
 
     this.logger.log(
       `Created pending action ${pendingAction.id} for user ${userId} ` +
-        `(${suggestion.forms.length} đơn, ${suggestion.coveredMinutes} phút)`,
+        `(${suggestion.forms.length} đơn: ${suggestion.absenceMinutes}p vắng mặt + ` +
+        `${suggestion.leaveMinutes}p phép năm, còn ${suggestion.projectedTotal}/` +
+        `${suggestion.allowedTotal} phút)`,
     );
 
     const config = this.configService.getConfig();
@@ -181,7 +191,7 @@ export class TimesheetSchedulerService {
       setting.autoApproveAfterMinutes,
       `${config.appUrl}/automation/approve/${pendingAction.id}`,
       `${config.appUrl}/automation/reject/${pendingAction.id}`,
-      buildDetail(monthYear, suggestion.forms),
+      buildDetail(monthYear, suggestion),
     );
   }
 }
@@ -200,8 +210,19 @@ function toMonthYear(date: Date): string {
   return `${String(date.getMonth() + 1).padStart(2, '0')}-${date.getFullYear()}`;
 }
 
-function buildDetail(monthYear: string, forms: SuggestedForm[]): string {
+function buildDetail(
+  monthYear: string,
+  suggestion: {
+    forms: SuggestedForm[];
+    absenceMinutes: number;
+    leaveMinutes: number;
+    projectedTotal: number;
+    allowedTotal: number;
+  },
+): string {
   const MAX_LINES = 8;
+  const { forms } = suggestion;
+
   const lines = forms.slice(0, MAX_LINES).map((form) => {
     const kind = form.usesAnnualLeave ? 'nghỉ phép' : 'vắng mặt';
     const covers = form.covers === 'late' ? 'đi muộn' : 'về sớm';
@@ -211,12 +232,14 @@ function buildDetail(monthYear: string, forms: SuggestedForm[]): string {
   const remaining = forms.length - MAX_LINES;
   if (remaining > 0) lines.push(`• ...và ${remaining} đơn khác`);
 
-  const annualLeave = forms
-    .filter((form) => form.usesAnnualLeave)
-    .reduce((sum, form) => sum + form.minutes, 0);
-  if (annualLeave > 0) {
-    lines.push(`\n<i>Trong đó ${annualLeave} phút dùng phép năm.</i>`);
-  }
+  lines.push('');
+  lines.push(
+    `<i>Đơn vắng mặt ${suggestion.absenceMinutes}p (không tốn phép năm)` +
+      (suggestion.leaveMinutes > 0
+        ? ` + phép năm ${suggestion.leaveMinutes}p`
+        : '') +
+      `. Sau khi duyệt: ${suggestion.projectedTotal}/${suggestion.allowedTotal} phút.</i>`,
+  );
 
   return `<b>Đơn đề xuất cho tháng ${monthYear}:</b>\n${lines.join('\n')}`;
 }

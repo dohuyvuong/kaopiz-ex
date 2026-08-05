@@ -72,8 +72,9 @@ export function AutoCreateApplicationsDialog({
             Tự động tạo đơn
           </DialogTitle>
           <DialogDescription>
-            Ưu tiên đơn vắng mặt (không tốn phép năm), chỉ dùng phép cho phần còn
-            lại. Chỉ tạo vừa đủ để về dưới hạn mức miễn phạt.
+            Dùng tối đa quota đơn vắng mặt của từng tuần vì nó không tốn phép
+            năm và hết hạn theo tuần. Phép năm chỉ dùng cho phần còn vượt hạn
+            mức.
           </DialogDescription>
         </DialogHeader>
 
@@ -81,22 +82,39 @@ export function AutoCreateApplicationsDialog({
           {suggestion && (
             <div className="rounded-md border p-3 text-sm space-y-1">
               <div>
-                Hiện tại:{' '}
-                <strong>{suggestion.currentTotal} phút</strong> / hạn mức{' '}
-                {suggestion.allowedTotal} phút
+                Hiện tại: <strong>{suggestion.currentTotal} phút</strong> / hạn
+                mức {suggestion.allowedTotal} phút
+                {suggestion.overageBefore > 0 && (
+                  <>
+                    {' '}
+                    —{' '}
+                    <strong className="text-destructive">
+                      vượt {suggestion.overageBefore} phút
+                    </strong>
+                  </>
+                )}
               </div>
-              {suggestion.neededMinutes > 0 ? (
-                <div>
-                  Cần che thêm:{' '}
-                  <strong className="text-destructive">
-                    {suggestion.neededMinutes} phút
-                  </strong>
-                </div>
-              ) : (
+
+              {suggestion.absenceMinutes > 0 && (
                 <div className="text-green-700">
-                  Chưa vượt hạn mức — không cần tạo đơn nào.
+                  Đơn vắng mặt che <strong>{suggestion.absenceMinutes} phút</strong>{' '}
+                  — không tốn phép năm.
                 </div>
               )}
+
+              <div>
+                Sau khi duyệt hết:{' '}
+                <strong
+                  className={
+                    suggestion.projectedTotal > suggestion.allowedTotal
+                      ? 'text-destructive'
+                      : 'text-green-700'
+                  }
+                >
+                  {suggestion.projectedTotal} phút
+                </strong>
+              </div>
+
               {auto.annualLeaveMinutes > 0 && (
                 <div className="text-muted-foreground">
                   Trong đó <strong>{auto.annualLeaveMinutes} phút</strong> dùng
@@ -114,6 +132,16 @@ export function AutoCreateApplicationsDialog({
               )}
             </div>
           )}
+
+          {suggestion && suggestion.overageBefore === 0 &&
+            suggestion.absenceMinutes > 0 && (
+              <div className="rounded-md border border-blue-300 bg-blue-50 p-3 text-sm text-blue-900">
+                Tháng này chưa vượt hạn mức, nhưng quota đơn vắng mặt của tuần
+                <strong> hết hạn theo tuần, không dồn sang tuần sau</strong>. Tạo
+                trước để dành chỗ trống cho những ngày đi muộn về sau — không tốn
+                phép năm.
+              </div>
+            )}
 
           {suggestion && suggestion.uncoveredMinutes > 0 && (
             <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">

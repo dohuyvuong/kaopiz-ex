@@ -49,13 +49,19 @@ export interface SuggestionResult {
   /** Tổng ước tính hiện tại (đã trừ đơn chờ duyệt). */
   currentTotal: number;
   allowedTotal: number;
-  /** Số phút cần che để về đúng hạn mức. */
-  neededMinutes: number;
-  /** Số phút các gợi ý che được. */
+  /** Số phút vượt hạn mức TRƯỚC khi áp các gợi ý. */
+  overageBefore: number;
+  /** Số phút đơn vắng mặt che được — không tốn phép năm. */
+  absenceMinutes: number;
+  /** Số phút phải dùng phép năm. */
+  leaveMinutes: number;
+  /** Tổng số phút các gợi ý che được. */
   coveredMinutes: number;
+  /** Tổng dự kiến sau khi tạo và duyệt hết các gợi ý. */
+  projectedTotal: number;
   /**
-   * Số phút không che nổi. Khác 0 nghĩa là đã hết cách trong giới hạn hiện có
-   * (hết quota tuần, hết ngày hợp lệ, quá hạn nộp).
+   * Số phút vẫn vượt hạn mức sau khi đã dùng hết cách. Khác 0 nghĩa là hết
+   * quota tuần, hết ngày hợp lệ, hoặc đã quá hạn nộp đơn.
    */
   uncoveredMinutes: number;
 }
@@ -232,34 +238,37 @@ export function suggestForms(options: SuggestOptions): SuggestionResult {
   const daysByDate = new Map(days.map((day) => [day.date, day]));
 
   // Tổng hiện tại đã tính cả đơn đang chờ duyệt như thể sẽ được duyệt.
-  let currentTotal = 0;
+  let pendingCovered = 0;
   for (const day of days) {
     const estimate = estimateDay(day, rules);
-    currentTotal +=
+    pendingCovered +=
       estimate.covered.minutesLate + estimate.covered.minutesEarly;
   }
-  currentTotal =
-    actualTotal.minutesLate + actualTotal.minutesEarly - currentTotal;
+  const currentTotal = Math.max(
+    0,
+    actualTotal.minutesLate + actualTotal.minutesEarly - pendingCovered,
+  );
 
   const allowedTotal = rules.allowedMinutesPerMonth;
-  const needed = Math.max(0, currentTotal - allowedTotal);
 
   const result: SuggestionResult = {
     forms: [],
     currentTotal,
     allowedTotal,
-    neededMinutes: needed,
+    overageBefore: Math.max(0, currentTotal - allowedTotal),
+    absenceMinutes: 0,
+    leaveMinutes: 0,
     coveredMinutes: 0,
-    uncoveredMinutes: needed,
+    projectedTotal: currentTotal,
+    uncoveredMinutes: Math.max(0, currentTotal - allowedTotal),
   };
-  if (needed <= 0) return result;
 
   const candidates = buildCandidates(days, rules);
   const absenceLimit = rules.reasonLimits.get(Reason.SHIFT_ADJUSTMENT);
   const maxPerAbsence = absenceLimit?.maxMinutesInDay ?? 60;
   const maxAbsencePerWeek = absenceLimit?.maxTimesInWeek ?? 2;
 
-  // Quota đơn vắng mặt của từng tuần: đếm cả đơn đã có lẫn đơn ta vừa đề xuất.
+  /** Quota đơn vắng mặt của từng tuần: tính cả đơn đã có lẫn đơn ta vừa đề xuất. */
   const absenceUsedByWeek = new Map<string, number>();
   const absenceQuotaLeft = (dateKey: string): number => {
     const week = startOfWorkWeek(dateKey);
@@ -271,8 +280,6 @@ export function suggestForms(options: SuggestOptions): SuggestionResult {
     }
     return maxAbsencePerWeek - (absenceUsedByWeek.get(week) ?? 0);
   };
-
-  let remaining = needed;
 
   const emit = (
     candidate: Candidate,
@@ -298,8 +305,9 @@ export function suggestForms(options: SuggestOptions): SuggestionResult {
     });
     candidate.free = consume(candidate.free, segment);
     candidate.remaining -= minutes;
-    remaining -= minutes;
     result.coveredMinutes += minutes;
+    if (typeId === FormType.ABSENCE) result.absenceMinutes += minutes;
+    else result.leaveMinutes += minutes;
   };
 
   /** Ngày còn trong hạn nộp đơn của loại này không. */
@@ -309,36 +317,62 @@ export function suggestForms(options: SuggestOptions): SuggestionResult {
     return daysBetween(dateKey, today) <= maxDaysAfter + 1;
   };
 
-  // Vòng 1 — đơn vắng mặt, không tốn phép.
+  /*
+   * Vòng 1 — đơn vắng mặt, dùng TỐI ĐA hạn mức tuần.
+   *
+   * Đây là quyền lợi cấp theo tuần và hết hạn: không dùng là mất, mà mất rồi
+   * thì phần đi muộn / về sớm của những tuần sau chỉ còn cách bù bằng phép năm.
+   * Vì vậy KHÔNG dừng lại khi tháng đã đủ dưới hạn mức — cứ tận dụng hết, phần
+   * dư ra là đệm cho những ngày muộn phát sinh về sau.
+   *
+   * Mỗi ngày tối đa một đơn, vì `max_minutes_in_day` giới hạn theo NGÀY chứ
+   * không theo từng đơn.
+   */
+  const absenceDays = new Set<string>();
   for (const candidate of candidates) {
-    if (remaining <= 0) break;
-    if (!withinDeadline(candidate.day.date, FormType.ABSENCE)) continue;
-    if (absenceQuotaLeft(candidate.day.date) <= 0) continue;
+    const date = candidate.day.date;
+    if (absenceDays.has(date)) continue;
+    if (!withinDeadline(date, FormType.ABSENCE)) continue;
+    if (absenceQuotaLeft(date) <= 0) continue;
     if (!hasEnoughWorkHours(candidate.day, rules)) continue;
 
-    const cap = Math.min(maxPerAbsence, candidate.remaining, remaining);
+    const cap = Math.min(maxPerAbsence, candidate.remaining);
     const segment = takeSegment(candidate.free, cap, candidate.covers);
     if (!segment) continue;
 
     emit(candidate, segment, FormType.ABSENCE, Reason.SHIFT_ADJUSTMENT);
+    absenceDays.add(date);
 
-    const week = startOfWorkWeek(candidate.day.date);
+    const week = startOfWorkWeek(date);
     absenceUsedByWeek.set(week, (absenceUsedByWeek.get(week) ?? 0) + 1);
   }
 
-  // Vòng 2 — nghỉ phép năm cho phần còn dư.
+  /*
+   * Vòng 2 — nghỉ phép năm, CHỈ cho phần còn vượt hạn mức.
+   *
+   * Ngược với vòng 1: phép năm là tài nguyên tốn kém nên chỉ tiêu đúng phần bắt
+   * buộc, không tiêu trước phòng xa.
+   */
+  let leaveNeeded = Math.max(
+    0,
+    currentTotal - result.absenceMinutes - allowedTotal,
+  );
+
   for (const candidate of candidates) {
-    if (remaining <= 0) break;
+    if (leaveNeeded <= 0) break;
     if (candidate.remaining <= 0) continue;
     if (!withinDeadline(candidate.day.date, FormType.LEAVE)) continue;
 
-    const cap = Math.min(candidate.remaining, remaining);
+    const cap = Math.min(candidate.remaining, leaveNeeded);
     const segment = takeSegment(candidate.free, cap, candidate.covers);
     if (!segment) continue;
 
+    const before = result.leaveMinutes;
     emit(candidate, segment, FormType.LEAVE, Reason.ANNUAL_LEAVE);
+    leaveNeeded -= result.leaveMinutes - before;
   }
 
-  result.uncoveredMinutes = Math.max(0, remaining);
+  result.projectedTotal = Math.max(0, currentTotal - result.coveredMinutes);
+  result.uncoveredMinutes = Math.max(0, result.projectedTotal - allowedTotal);
   return result;
 }

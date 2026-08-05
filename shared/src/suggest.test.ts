@@ -41,20 +41,52 @@ const julTotal = {
   minutesEarly: julData.summary.minutesEarly,
 };
 
-describe('không gợi ý khi chưa vượt hạn mức', () => {
-  it('tháng 04/2026 tổng 79 phút < 90 → không cần đơn nào', () => {
-    const result = suggestForms({
-      days: daysOf(aprData),
-      rules,
-      actualTotal: {
-        minutesLate: aprData.summary.minutesLate,
-        minutesEarly: aprData.summary.minutesEarly,
-      },
-      today: '2026-05-01',
-    });
+describe('quota đơn vắng mặt là quyền lợi hết hạn theo tuần', () => {
+  /*
+   * Đơn vắng mặt lý do 21 được cấp 2 lần mỗi TUẦN và không dồn sang tuần sau.
+   * Không dùng là mất. Vì hạn nộp đơn chỉ vài ngày, hạn mức của tuần đã qua
+   * không thể lấy lại — nên phải tận dụng ngay cả khi tháng chưa vượt mức phạt,
+   * để dành chỗ trống cho những ngày đi muộn phát sinh về sau.
+   */
+  const aprResult = suggestForms({
+    days: daysOf(aprData),
+    rules,
+    actualTotal: {
+      minutesLate: aprData.summary.minutesLate,
+      minutesEarly: aprData.summary.minutesEarly,
+    },
+    today: '2026-05-01',
+  });
 
-    expect(result.neededMinutes).toBe(0);
-    expect(result.forms).toEqual([]);
+  it('tháng 04/2026 tổng 79 phút < 90 nên không cần phép năm', () => {
+    expect(aprResult.currentTotal).toBe(79);
+    expect(aprResult.overageBefore).toBe(0);
+    expect(aprResult.leaveMinutes).toBe(0);
+  });
+
+  it('nhưng vẫn dùng quota đơn vắng mặt còn lại của tuần', () => {
+    // Tuần 30/03–05/04 mới dùng 1/2 (đơn ngày 02/04); 01/04 muộn 20 phút và làm
+    // đủ giờ nên vẫn đáng làm đơn, dù tháng chưa vượt hạn mức.
+    expect(aprResult.forms).toHaveLength(1);
+    expect(aprResult.forms[0]).toMatchObject({
+      date: '2026-04-01',
+      typeId: FormType.ABSENCE,
+      reasonId: Reason.SHIFT_ADJUSTMENT,
+      minutes: 20,
+      usesAnnualLeave: false,
+    });
+  });
+
+  it('kéo tổng tháng xuống, tạo đệm cho phần còn lại của tháng', () => {
+    expect(aprResult.projectedTotal).toBe(59);
+  });
+
+  it('các tuần đã dùng hết 2 đơn thì không đề xuất thêm', () => {
+    // Tuần 06–12/04 và 13–19/04 đều đã có 2 đơn lý do 21 đã duyệt.
+    const inFullWeeks = aprResult.forms.filter(
+      (form) => form.date >= '2026-04-06' && form.date <= '2026-04-19',
+    );
+    expect(inFullWeeks).toEqual([]);
   });
 });
 
@@ -69,9 +101,10 @@ describe('tháng 07/2026 — vượt 25 phút', () => {
   it('chỉ cần che đúng phần vượt, không che cả 115 phút', () => {
     expect(result.currentTotal).toBe(115);
     expect(result.allowedTotal).toBe(90);
-    expect(result.neededMinutes).toBe(25);
-    expect(result.coveredMinutes).toBe(25);
+    expect(result.overageBefore).toBe(25);
     expect(result.uncoveredMinutes).toBe(0);
+    // Phép năm chỉ dùng đúng phần đơn vắng mặt không gánh nổi.
+    expect(result.leaveMinutes).toBe(25 - result.absenceMinutes);
   });
 
   it('thử đơn vắng mặt trước vì không tốn phép năm', () => {
@@ -216,6 +249,56 @@ describe('không đề xuất trùng lên đơn đã có trong ngày', () => {
   });
 });
 
+describe('một ngày có thể cần hai đơn nối tiếp', () => {
+  // HRM cho phép nhiều đơn trong cùng ngày miễn không trùng giờ. Đơn vắng mặt bị
+  // chặn trần 60 phút/ngày, nên ngày muộn nhiều hơn thế phải bù tiếp bằng phép.
+  const heavyDay: CalendarDay = {
+    date: '2026-07-06',
+    work: '1',
+    timeIn: '10:00',
+    timeOut: '19:30',
+    timeInFinal: '10:00',
+    timeOutFinal: '19:30',
+    actual: { minutesLate: 90, minutesEarly: 0 },
+    forms: [],
+    symbol: null,
+    logWork: null,
+  };
+
+  it('đơn vắng mặt lấy trần 60 phút, phép năm nối tiếp phần còn lại', () => {
+    const result = suggestForms({
+      days: [heavyDay],
+      // Hạn mức 0 để buộc phải che toàn bộ 90 phút.
+      rules: { ...rules, allowedMinutesPerMonth: 0 },
+      actualTotal: { minutesLate: 90, minutesEarly: 0 },
+      today: '2026-07-07',
+    });
+
+    expect(result.absenceMinutes).toBe(60);
+    expect(result.leaveMinutes).toBe(30);
+    expect(result.projectedTotal).toBe(0);
+
+    const [absence, leave] = result.forms;
+    expect(absence).toMatchObject({ timeStart: '08:30', timeEnd: '09:30' });
+    // Nối tiếp, không chồng lên đơn vắng mặt.
+    expect(leave).toMatchObject({ timeStart: '09:30', timeEnd: '10:00' });
+    expect(leave.usesAnnualLeave).toBe(true);
+  });
+
+  it('không tạo hai đơn vắng mặt cho cùng một ngày', () => {
+    const result = suggestForms({
+      days: [heavyDay],
+      rules: { ...rules, allowedMinutesPerMonth: 0 },
+      actualTotal: { minutesLate: 90, minutesEarly: 0 },
+      today: '2026-07-07',
+    });
+    const absences = result.forms.filter(
+      (form) => form.typeId === FormType.ABSENCE,
+    );
+    expect(absences).toHaveLength(1);
+  });
+});
+
 describe('tuần vắt qua hai tháng', () => {
   // Tuần 29/06–05/07 nằm một nửa ở tháng 6. API calendar tháng 7 KHÔNG trả các
   // ngày tháng 6, nên nếu người gọi không bổ sung chúng thì quota tuần bị đếm
@@ -274,8 +357,8 @@ describe('tuần vắt qua hai tháng', () => {
           form.date === '2026-07-01' && form.typeId === FormType.ABSENCE,
       ),
     ).toBe(false);
-    // Vẫn che đủ phần vượt, chỉ là bằng phép năm.
-    expect(result.coveredMinutes).toBe(result.neededMinutes);
+    // Vẫn về đúng hạn mức, chỉ là phải trả bằng phép năm.
+    expect(result.uncoveredMinutes).toBe(0);
   });
 
   it('ngày dựng từ day-detail không bao giờ được chọn làm ứng viên tạo đơn', () => {
