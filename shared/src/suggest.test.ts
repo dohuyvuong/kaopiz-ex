@@ -467,6 +467,89 @@ describe('cửa sổ gợi ý — chỉ những ngày còn nộp đơn được'
   });
 });
 
+describe('quota tính riêng cho từng tuần', () => {
+  /*
+   * Cửa sổ gợi ý 7 ngày thường VẮT QUA hai tuần. Ví dụ hôm nay thứ Hai 20/07 thì
+   * cửa sổ là 13/07–20/07: 13–19/07 là một tuần, còn 20/07 mở đầu tuần mới.
+   * Quota 2 đơn/tuần phải đếm riêng cho từng tuần — tuần trước tiêu hết không
+   * được phép ảnh hưởng tới ngày đầu tuần này.
+   */
+  const violationDay = (date: string): CalendarDay => ({
+    date,
+    work: '1',
+    timeIn: '08:50',
+    timeOut: '19:00',
+    timeInFinal: '08:50',
+    timeOutFinal: '19:00',
+    actual: { minutesLate: 20, minutesEarly: 0 },
+    forms: [],
+    symbol: null,
+    logWork: null,
+  });
+
+  /** Ngày đã tiêu một suất quota bằng đơn lý do 21 đã duyệt. */
+  const quotaUsedDay = (date: string, id: number): CalendarDay => ({
+    ...violationDay(date),
+    actual: { minutesLate: 0, minutesEarly: 0 },
+    forms: [
+      {
+        id,
+        typeId: FormType.ABSENCE,
+        isApproved: true,
+        reasonId: Reason.SHIFT_ADJUSTMENT,
+        typeName: 'Đơn vắng mặt',
+        intervals: [{ start: '08:30', end: '08:50' }],
+        punches: [],
+      },
+    ],
+  });
+
+  const days = [
+    violationDay('2026-07-13'), // thứ Hai tuần trước
+    violationDay('2026-07-14'),
+    quotaUsedDay('2026-07-15', 9001),
+    quotaUsedDay('2026-07-17', 9002), // tuần 13–19/07 hết quota
+    violationDay('2026-07-20'), // thứ Hai tuần mới, cũng là hôm nay
+  ];
+
+  const result = suggestForms({
+    days,
+    rules: { ...rules, allowedMinutesPerMonth: 0 },
+    actualTotal: { minutesLate: 60, minutesEarly: 0 },
+    today: '2026-07-20',
+  });
+
+  const absences = result.forms.filter(
+    (form) => form.typeId === FormType.ABSENCE,
+  );
+
+  it('tuần trước hết quota thì 13 và 14/07 không có đơn vắng mặt', () => {
+    expect(absences.some((form) => form.date === '2026-07-13')).toBe(false);
+    expect(absences.some((form) => form.date === '2026-07-14')).toBe(false);
+  });
+
+  it('20/07 mở đầu tuần mới nên vẫn còn nguyên quota', () => {
+    expect(absences.map((form) => form.date)).toEqual(['2026-07-20']);
+    expect(absences[0].minutes).toBe(20);
+  });
+
+  it('nếu chính tuần mới cũng hết quota thì 20/07 mới bị chặn', () => {
+    const blocked = suggestForms({
+      days: [
+        ...days,
+        quotaUsedDay('2026-07-21', 9003),
+        quotaUsedDay('2026-07-22', 9004),
+      ],
+      rules: { ...rules, allowedMinutesPerMonth: 0 },
+      actualTotal: { minutesLate: 60, minutesEarly: 0 },
+      today: '2026-07-20',
+    });
+    expect(
+      blocked.forms.filter((form) => form.typeId === FormType.ABSENCE),
+    ).toEqual([]);
+  });
+});
+
 describe('hạn nộp đơn', () => {
   it('bỏ qua ngày đã quá hạn, và báo phần không che nổi', () => {
     // Đứng ở 30/09 thì mọi ngày tháng 7 đều quá hạn 7 ngày.
