@@ -110,6 +110,12 @@ export interface TimesheetRules {
   reasonLimits: Map<number, ReasonLimit>;
   /** typeId → số ngày còn được nộp đơn sau ngày áp dụng. */
   maxDaysAfterByType: Map<number, number>;
+  /**
+   * Hạn nộp dùng khi HRM không trả cấu hình riêng cho loại đơn đó.
+   * Có giá trị mặc định vì phần gợi ý đơn BẮT BUỘC phải biết cửa sổ hợp lệ —
+   * gợi ý một ngày đã quá hạn là gợi ý chắc chắn tạo không được.
+   */
+  defaultMaxDaysAfter: number;
 }
 
 export interface ReasonLimit {

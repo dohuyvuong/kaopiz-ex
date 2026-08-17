@@ -55,7 +55,7 @@ describe('quota đơn vắng mặt là quyền lợi hết hạn theo tuần', (
       minutesLate: aprData.summary.minutesLate,
       minutesEarly: aprData.summary.minutesEarly,
     },
-    today: '2026-05-01',
+    today: '2026-04-05',
   });
 
   it('tháng 04/2026 tổng 79 phút < 90 nên không cần phép năm', () => {
@@ -90,12 +90,13 @@ describe('quota đơn vắng mặt là quyền lợi hết hạn theo tuần', (
   });
 });
 
-describe('tháng 07/2026 — vượt 25 phút', () => {
+describe('tháng 07/2026 — vượt 25 phút, đứng ở ngày 08/07', () => {
+  // `today` phải gần ngày vi phạm: gợi ý chỉ xét các ngày còn nộp đơn được.
   const result = suggestForms({
     days: julDays,
     rules,
     actualTotal: julTotal,
-    today: '2026-08-03',
+    today: '2026-07-08',
   });
 
   it('chỉ cần che đúng phần vượt, không che cả 115 phút', () => {
@@ -121,16 +122,19 @@ describe('tháng 07/2026 — vượt 25 phút', () => {
     expect(absenceOn31).toBeUndefined();
   });
 
-  it('bỏ qua tuần 13–19/07 vì đã dùng hết 2 đơn lý do 21', () => {
-    // 15/07 và 17/07 đã có đơn lý do 21 ĐÃ DUYỆT — hết quota tuần, dù 13/07 và
-    // 16/07 là hai ngày vi phạm nặng tiếp theo (17 và 13 phút).
-    const inThatWeek = result.forms.filter(
-      (form) =>
-        form.date >= '2026-07-13' &&
-        form.date <= '2026-07-19' &&
-        form.typeId === FormType.ABSENCE,
-    );
-    expect(inThatWeek).toEqual([]);
+  it('bỏ qua tuần đã dùng hết 2 đơn lý do 21', () => {
+    // Đứng ở 17/07: cửa sổ gồm 13, 14, 16/07 — ba ngày vi phạm nặng. Nhưng 15/07
+    // và 17/07 đã có đơn lý do 21 ĐÃ DUYỆT nên tuần 13–19/07 hết quota.
+    const midMonth = suggestForms({
+      days: julDays,
+      rules,
+      actualTotal: julTotal,
+      today: '2026-07-17',
+    });
+    expect(
+      midMonth.forms.filter((form) => form.typeId === FormType.ABSENCE),
+    ).toEqual([]);
+    expect(midMonth.absenceMinutes).toBe(0);
   });
 
   it('chọn 01/07 — ngày nặng nhất còn quota tuần và đủ giờ làm', () => {
@@ -141,11 +145,13 @@ describe('tháng 07/2026 — vượt 25 phút', () => {
     expect(result.forms[0].minutes).toBe(12);
   });
 
-  it('phần còn dư mới dùng phép năm, và đặt vào ngày nặng nhất', () => {
+  it('phần còn dư mới dùng phép năm, rải theo ngày nặng nhất trong hạn', () => {
     const leave = result.forms.filter((form) => form.usesAnnualLeave);
-    expect(leave).toHaveLength(1);
-    expect(leave[0].date).toBe('2026-07-31');
-    expect(leave[0].minutes).toBe(13);
+    expect(leave.map((form) => `${form.date}:${form.minutes}`)).toEqual([
+      '2026-07-08:10',
+      '2026-07-03:3',
+    ]);
+    expect(result.leaveMinutes).toBe(13);
     expect(leave[0].reasonId).toBe(Reason.ANNUAL_LEAVE);
   });
 
@@ -162,7 +168,7 @@ describe('tôn trọng giới hạn của lý do, đọc từ API', () => {
       days: julDays,
       rules: strict,
       actualTotal: julTotal,
-      today: '2026-08-03',
+      today: '2026-07-08',
     });
 
     const absences = result.forms.filter(
@@ -180,7 +186,7 @@ describe('tôn trọng giới hạn của lý do, đọc từ API', () => {
       days: julDays,
       rules: strict,
       actualTotal: julTotal,
-      today: '2026-08-03',
+      today: '2026-07-08',
     });
 
     const perWeek = new Map<string, number>();
@@ -201,7 +207,7 @@ describe('tôn trọng giới hạn của lý do, đọc từ API', () => {
       days: julDays,
       rules: strict,
       actualTotal: julTotal,
-      today: '2026-08-03',
+      today: '2026-07-08',
     });
 
     expect(result.forms.some((form) => form.usesAnnualLeave)).toBe(true);
@@ -332,7 +338,7 @@ describe('tuần vắt qua hai tháng', () => {
       days: julDays,
       rules,
       actualTotal: julTotal,
-      today: '2026-08-03',
+      today: '2026-07-08',
     });
     // Chỉ thấy 1/2 đơn của tuần nên vẫn đề xuất thêm cho 01/07.
     expect(
@@ -348,7 +354,7 @@ describe('tuần vắt qua hai tháng', () => {
       days: [...julDays, juneDay],
       rules,
       actualTotal: julTotal,
-      today: '2026-08-03',
+      today: '2026-07-08',
     });
 
     expect(
@@ -366,9 +372,98 @@ describe('tuần vắt qua hai tháng', () => {
       days: [...julDays, juneDay],
       rules,
       actualTotal: julTotal,
-      today: '2026-08-03',
+      today: '2026-07-08',
     });
     expect(result.forms.some((form) => form.date === '2026-06-30')).toBe(false);
+  });
+});
+
+describe('cửa sổ gợi ý — chỉ những ngày còn nộp đơn được', () => {
+  /*
+   * Khác `checkDraftForm` (chỉ cảnh báo để người dùng tự quyết), phần GỢI Ý phải
+   * tự lọc: đề xuất một ngày chắc chắn không nộp được đơn là đề xuất vô ích.
+   */
+  it('ngày quá hạn nộp không được gợi ý, dù vẫn còn vi phạm', () => {
+    // Đứng ở 03/08: chỉ 31/07 còn trong hạn 7 ngày. 01/07 đã quá hạn từ lâu.
+    const result = suggestForms({
+      days: julDays,
+      rules,
+      actualTotal: julTotal,
+      today: '2026-08-03',
+    });
+
+    expect(result.forms.every((form) => form.date >= '2026-07-27')).toBe(true);
+    expect(result.forms.some((form) => form.date === '2026-07-01')).toBe(false);
+  });
+
+  const dayTemplate: CalendarDay = {
+    date: '2026-07-08',
+    work: '1',
+    timeIn: '09:00',
+    timeOut: '17:00',
+    timeInFinal: '09:00',
+    timeOutFinal: '17:00',
+    actual: { minutesLate: 30, minutesEarly: 0 },
+    forms: [],
+    symbol: null,
+    logWork: null,
+  };
+  const totalOf = (day: CalendarDay) => ({
+    minutesLate: day.actual.minutesLate,
+    minutesEarly: day.actual.minutesEarly,
+  });
+
+  it('hôm nay chưa tan ca thì chưa gợi ý', () => {
+    // Ra về 17:00, sớm hơn giờ tan ca 17:30 → có thể vẫn đang làm.
+    const result = suggestForms({
+      days: [dayTemplate],
+      rules: { ...rules, allowedMinutesPerMonth: 0 },
+      actualTotal: totalOf(dayTemplate),
+      today: dayTemplate.date,
+    });
+    expect(result.forms).toEqual([]);
+    expect(result.uncoveredMinutes).toBe(30);
+  });
+
+  it('hôm nay đã tan ca thì gợi ý bình thường', () => {
+    const finished: CalendarDay = {
+      ...dayTemplate,
+      timeOut: '18:00',
+      timeOutFinal: '18:00',
+    };
+    const result = suggestForms({
+      days: [finished],
+      rules: { ...rules, allowedMinutesPerMonth: 0 },
+      actualTotal: totalOf(finished),
+      today: finished.date,
+    });
+    expect(result.forms).toHaveLength(1);
+    expect(result.forms[0].minutes).toBe(30);
+  });
+
+  it('ngày chưa chấm công ra thì coi như chưa tan ca', () => {
+    const noCheckout: CalendarDay = {
+      ...dayTemplate,
+      timeOut: null,
+      timeOutFinal: null,
+    };
+    const result = suggestForms({
+      days: [noCheckout],
+      rules: { ...rules, allowedMinutesPerMonth: 0 },
+      actualTotal: totalOf(noCheckout),
+      today: noCheckout.date,
+    });
+    expect(result.forms).toEqual([]);
+  });
+
+  it('ngày tương lai không bao giờ được gợi ý', () => {
+    const result = suggestForms({
+      days: [{ ...dayTemplate, timeOut: '18:00', timeOutFinal: '18:00' }],
+      rules: { ...rules, allowedMinutesPerMonth: 0 },
+      actualTotal: totalOf(dayTemplate),
+      today: '2026-07-07',
+    });
+    expect(result.forms).toEqual([]);
   });
 });
 

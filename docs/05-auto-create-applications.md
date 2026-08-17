@@ -41,6 +41,32 @@ Lý do 21 có tên đầy đủ là *"Thay đổi thời gian làm việc (Vẫn
 
 Ví dụ 31/07/2026: muộn 35 phút — nặng nhất tháng — nhưng ra về lúc `15:55`. Giờ hiệu quả là 5h50, và về sớm nên không bù được. **Không đủ điều kiện** cho lý do 21, phải dùng phép năm.
 
+## Cửa sổ gợi ý: chỉ những ngày còn nộp đơn được
+
+Hạn nộp đơn cho một ngày là **7 ngày** (`max_days_after: 6` + chính ngày đó).
+Đây là chỗ phần **gợi ý** khác phần **tạo tay**:
+
+| | Tạo tay | Gợi ý tự động |
+|---|---|---|
+| Quá hạn nộp | cảnh báo, vẫn gửi được | **không đưa vào danh sách** |
+
+Người dùng tự tạo thì có thể có lý do ta không biết, nên chỉ cảnh báo. Còn gợi ý
+một ngày chắc chắn không nộp được đơn thì chỉ làm nhiễu.
+
+**Ngày hôm nay** chỉ được gợi ý khi **ca làm đã kết thúc** — có lần chấm công sau
+giờ tan ca. Đang giữa ngày thì số phút về sớm chưa chốt: ở lại thêm là tự hết, làm
+đơn lúc này là phí một suất quota tuần. Ngày tương lai không bao giờ được gợi ý.
+
+Hệ quả: đứng ở ngày 03/08 nhìn tháng 7, chỉ 31/07 còn trong hạn — các ngày đầu
+tháng dù còn vi phạm cũng không thể xử lý được nữa. Đây là lý do cron chạy **hằng
+ngày** thay vì cuối tháng.
+
+## Sửa lại trước khi tạo
+
+Đề xuất của máy chỉ là điểm khởi đầu. Mỗi dòng trong dialog có hai ô giờ sửa
+được, số phút tự tính lại theo. Giờ không hợp lệ (kết thúc không sau bắt đầu) thì
+chặn gửi — đây là lỗi kỹ thuật, không phải rule HRM.
+
 ## Không đề xuất chồng lên đơn sẵn có
 
 Khoảng giờ đề xuất được tính bằng cách **trừ đi phần đã bị đơn khác chiếm** trong cửa sổ vi phạm.
@@ -109,7 +135,7 @@ Vài điểm đáng lưu ý:
 - **Quét trọn tháng, không phải N ngày gần đây.** Vi phạm tính theo tháng nên "7 ngày gần đây" không trả lời được câu "tháng này có vượt hạn mức không". Trước ngày 10 thì quét cả tháng trước, vì tháng trước vẫn còn trong hạn nộp đơn.
 - **Chạy hằng ngày là cố ý.** Quota đơn vắng mặt hết hạn theo tuần, nên phải nhắc sớm — đợi tới cuối tháng thì quota các tuần đầu đã mất.
 - **Chống gửi trùng.** Cron chạy hằng ngày; đã có pending action chờ xử lý thì bỏ qua.
-- **Người duyệt tra lúc thực thi**, không lưu trong payload — từ lúc gửi thông báo tới lúc bấm duyệt có thể vài giờ, đủ để người dùng đổi lựa chọn.
+- **Người duyệt tra lúc thực thi**, không lưu trong payload — từ lúc gửi thông báo tới lúc bấm duyệt có thể vài giờ, đủ để người dùng đổi lựa chọn. Người duyệt đã lưu còn được đối chiếu với `/application/approval-assignments` để bắt trường hợp họ đã nghỉ việc hoặc đổi phòng ban; API đó lỗi thì bỏ qua bước đối chiếu chứ không chặn.
 - Một đơn lỗi không chặn các đơn còn lại; hỏng toàn bộ thì ném lỗi thay vì im lặng.
 
 ## Giới hạn đã biết

@@ -27,6 +27,7 @@ import {
   SuggestedForm,
   TimesheetRules,
   suggestForms,
+  toMinutes,
 } from '@kaopiz/timesheet';
 
 interface UseAutoCreateOptions {
@@ -45,9 +46,21 @@ export interface CreateFailure {
   reason: string;
 }
 
-/** Khoá ổn định của một đơn đề xuất — dùng để nhận diện qua các lần tính lại. */
+/**
+ * Khoá ổn định của một đơn đề xuất.
+ *
+ * KHÔNG gồm giờ: người dùng sửa được giờ, mà khoá đổi theo thì phần đã sửa và
+ * phần đã bỏ sẽ mất dấu sau mỗi lần tính lại. Mỗi (ngày, loại đơn, chiều che)
+ * chỉ sinh tối đa một đề xuất nên bấy nhiêu là đủ phân biệt.
+ */
 function formKey(form: SuggestedForm): string {
-  return `${form.date}|${form.typeId}|${form.timeStart}|${form.timeEnd}`;
+  return `${form.date}|${form.typeId}|${form.covers}`;
+}
+
+/** Giờ do người dùng chỉnh tay, đè lên giờ máy đề xuất. */
+interface TimeOverride {
+  timeStart: string;
+  timeEnd: string;
 }
 
 export function useAutoCreateApplications({
@@ -68,6 +81,10 @@ export function useAutoCreateApplications({
   const [failures, setFailures] = useState<CreateFailure[]>([]);
   /** Các đơn người dùng đã bỏ khỏi danh sách, theo khoá ổn định. */
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  /** Giờ người dùng tự sửa, theo khoá ổn định. */
+  const [overrides, setOverrides] = useState<Map<string, TimeOverride>>(
+    new Map(),
+  );
 
   const suggestion = useMemo(() => {
     if (!rules || !actualTotal) return null;
@@ -80,13 +97,31 @@ export function useAutoCreateApplications({
    * tự cập nhật mà vẫn giữ nguyên những dòng người dùng đã bỏ.
    */
   const forms = useMemo(
-    () => (suggestion?.forms ?? []).filter((form) => !dismissed.has(formKey(form))),
-    [suggestion, dismissed],
+    () =>
+      (suggestion?.forms ?? [])
+        .filter((form) => !dismissed.has(formKey(form)))
+        .map((form) => {
+          const override = overrides.get(formKey(form));
+          if (!override) return form;
+          const minutes = durationMinutes(
+            override.timeStart,
+            override.timeEnd,
+          );
+          return {
+            ...form,
+            timeStart: override.timeStart,
+            timeEnd: override.timeEnd,
+            // Giờ đổi thì số phút che được cũng đổi theo.
+            minutes: minutes ?? 0,
+          };
+        }),
+    [suggestion, dismissed, overrides],
   );
 
   useEffect(() => {
     if (!open) return;
     setDismissed(new Set());
+    setOverrides(new Map());
     setFailures([]);
     setProgress({ current: 0, total: 0 });
   }, [open]);
@@ -149,12 +184,55 @@ export function useAutoCreateApplications({
     setDismissed((prev) => new Set(prev).add(formKey(form)));
   }, []);
 
+  const setFormTime = useCallback(
+    (form: SuggestedForm, patch: Partial<TimeOverride>) => {
+      setOverrides((prev) => {
+        const key = formKey(form);
+        const current = prev.get(key) ?? {
+          timeStart: form.timeStart,
+          timeEnd: form.timeEnd,
+        };
+        return new Map(prev).set(key, { ...current, ...patch });
+      });
+    },
+    [],
+  );
+
+  /** Đơn có giờ không hợp lệ thì chặn gửi — cái này là lỗi kỹ thuật, không phải rule HRM. */
+  const hasInvalidTime = forms.some((form) => form.minutes <= 0);
+
   const createAll = useCallback(async (): Promise<boolean> => {
     if (!appToken || !userId || forms.length === 0) return false;
 
     setIsCreating(true);
     setFailures([]);
     setProgress({ current: 0, total: forms.length });
+
+    // Người duyệt đã lưu có thể đã nghỉ việc hoặc đổi phòng ban. Đối chiếu với
+    // danh sách hiện hành để báo lỗi rõ ràng tại chỗ, thay vì để HRM từ chối
+    // giữa chừng khi đã tạo được một nửa số đơn.
+    const assignments = new Map<string, number[]>();
+    try {
+      const usedTypeIds = [...new Set(forms.map((form) => form.typeId))];
+      for (const typeId of usedTypeIds) {
+        const type = types.find((item) => item.id === typeId);
+        for (let order = 1; order <= (type?.orderMax ?? 0); order += 1) {
+          const response = await applicationApi.getApprovalAssignments(
+            typeId,
+            order,
+            userId,
+          );
+          assignments.set(
+            `${typeId}|${order}`,
+            (response.items ?? []).map((item) => item.userId),
+          );
+        }
+      }
+    } catch {
+      // Không lấy được danh sách thì bỏ qua bước đối chiếu — thà gửi đi và để
+      // HRM phán, còn hơn chặn người dùng vì một API phụ lỗi.
+      assignments.clear();
+    }
 
     const failed: CreateFailure[] = [];
 
@@ -169,9 +247,19 @@ export function useAutoCreateApplications({
         const approvals = Array.from(
           { length: type?.orderMax ?? 0 },
           (_, position) => position + 1,
-        ).flatMap((order) =>
-          saved[order] ? [{ userId: saved[order]!, order }] : [],
-        );
+        ).flatMap((order) => {
+          const approverId = saved[order];
+          if (!approverId) return [];
+
+          const valid = assignments.get(`${form.typeId}|${order}`);
+          if (valid && !valid.includes(approverId)) {
+            throw new Error(
+              `Người duyệt ${order} đã lưu không còn trong danh sách được duyệt ` +
+                `"${type?.name ?? form.typeId}". Chọn lại người duyệt.`,
+            );
+          }
+          return [{ userId: approverId, order }];
+        });
 
         if (type && approvals.length < type.orderMax) {
           throw new Error(
@@ -238,6 +326,8 @@ export function useAutoCreateApplications({
     forms,
     formKey,
     removeForm,
+    setFormTime,
+    hasInvalidTime,
     totalMinutes,
     annualLeaveMinutes,
     annualLeaveDays,
@@ -250,4 +340,12 @@ export function useAutoCreateApplications({
     failures,
     createAll,
   };
+}
+
+/** Số phút giữa hai mốc "HH:mm"; `null` nếu không hợp lệ. */
+function durationMinutes(start: string, end: string): number | null {
+  const from = toMinutes(start);
+  const to = toMinutes(end);
+  if (from == null || to == null || to <= from) return null;
+  return to - from;
 }

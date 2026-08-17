@@ -285,6 +285,7 @@ export function buildRules(input: {
   workingTime?: RawWorkingTime | null;
   reasons?: RawReason[];
   maxDaysAfterByType?: Array<{ typeId: number; maxDaysAfter: number }>;
+  defaultMaxDaysAfter?: number;
 }): TimesheetRules {
   const workingTime = input.workingTime ?? {};
 
@@ -306,5 +307,7 @@ export function buildRules(input: {
         entry.maxDaysAfter,
       ]),
     ),
+    // HRM đang cấu hình 6 ngày sau + chính ngày đó = hạn 7 ngày.
+    defaultMaxDaysAfter: input.defaultMaxDaysAfter ?? 6,
   };
 }

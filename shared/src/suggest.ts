@@ -24,7 +24,9 @@ import {
   countReasonUsageInWeek,
   daysBetween,
   hasEnoughWorkHours,
+  hasWorkdayEnded,
   startOfWorkWeek,
+  submissionDeadlineDays,
 } from './rules';
 import { CalendarDay, FormType, Reason, TimesheetRules } from './types';
 
@@ -233,6 +235,33 @@ export interface SuggestOptions {
   today: string;
 }
 
+/**
+ * Ngày này có đáng đưa vào danh sách gợi ý không.
+ *
+ * Khác với `checkDraftForm` (chỉ cảnh báo, để người dùng tự quyết), phần GỢI Ý
+ * phải tự lọc: đề xuất một ngày chắc chắn không tạo được đơn là đề xuất vô ích.
+ *
+ * - Ngày tương lai: bỏ qua.
+ * - Hôm nay: chỉ gợi ý khi ca làm đã kết thúc. Đang giữa ngày thì số phút về sớm
+ *   chưa chốt — ở lại thêm là tự hết, làm đơn lúc này là phí một suất quota.
+ * - Quá hạn nộp: bỏ qua, xét theo hạn dài nhất trong các loại đơn ta dùng.
+ */
+function isSuggestable(
+  day: CalendarDay,
+  rules: TimesheetRules,
+  today: string,
+): boolean {
+  const elapsed = daysBetween(day.date, today);
+  if (elapsed < 0) return false;
+  if (elapsed === 0 && !hasWorkdayEnded(day, rules)) return false;
+
+  const longestDeadline = Math.max(
+    submissionDeadlineDays(rules, FormType.ABSENCE),
+    submissionDeadlineDays(rules, FormType.LEAVE),
+  );
+  return elapsed <= longestDeadline;
+}
+
 export function suggestForms(options: SuggestOptions): SuggestionResult {
   const { days, rules, actualTotal, today } = options;
   const daysByDate = new Map(days.map((day) => [day.date, day]));
@@ -263,7 +292,9 @@ export function suggestForms(options: SuggestOptions): SuggestionResult {
     uncoveredMinutes: Math.max(0, currentTotal - allowedTotal),
   };
 
-  const candidates = buildCandidates(days, rules);
+  const candidates = buildCandidates(days, rules).filter((candidate) =>
+    isSuggestable(candidate.day, rules, today),
+  );
   const absenceLimit = rules.reasonLimits.get(Reason.SHIFT_ADJUSTMENT);
   const maxPerAbsence = absenceLimit?.maxMinutesInDay ?? 60;
   const maxAbsencePerWeek = absenceLimit?.maxTimesInWeek ?? 2;
@@ -311,11 +342,8 @@ export function suggestForms(options: SuggestOptions): SuggestionResult {
   };
 
   /** Ngày còn trong hạn nộp đơn của loại này không. */
-  const withinDeadline = (dateKey: string, typeId: number): boolean => {
-    const maxDaysAfter = rules.maxDaysAfterByType.get(typeId);
-    if (maxDaysAfter == null) return true;
-    return daysBetween(dateKey, today) <= maxDaysAfter + 1;
-  };
+  const withinDeadline = (dateKey: string, typeId: number): boolean =>
+    daysBetween(dateKey, today) <= submissionDeadlineDays(rules, typeId);
 
   /*
    * Vòng 1 — đơn vắng mặt, dùng TỐI ĐA hạn mức tuần.

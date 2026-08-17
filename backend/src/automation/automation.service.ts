@@ -477,6 +477,35 @@ export class AutomationService {
       this.approverPreferenceService.getAll(userId),
     ]);
 
+    // Người duyệt đã lưu có thể đã nghỉ việc hoặc đổi phòng ban trong khoảng
+    // thời gian từ lúc gửi thông báo tới lúc duyệt. Đối chiếu trước để báo lỗi
+    // rõ ràng thay vì để HRM từ chối giữa chừng.
+    const validApprovers = new Map<string, number[]>();
+    try {
+      const usedTypeIds = [...new Set(forms.map((form) => form.typeId))];
+      for (const typeId of usedTypeIds) {
+        const type = types.items?.find((item) => item.id === typeId);
+        for (let order = 1; order <= (type?.orderMax ?? 0); order += 1) {
+          const response = await this.applicationService.getApprovalAssignments(
+            token,
+            typeId,
+            order,
+            userId,
+          );
+          validApprovers.set(
+            `${typeId}|${order}`,
+            (response.items ?? []).map((item) => item.userId),
+          );
+        }
+      }
+    } catch (error) {
+      // API phụ lỗi thì bỏ bước đối chiếu, vẫn gửi và để HRM phán.
+      this.logger.warn(
+        `Không lấy được danh sách người duyệt: ${String(error)}`,
+      );
+      validApprovers.clear();
+    }
+
     const failures: string[] = [];
 
     for (const form of forms) {
@@ -494,6 +523,15 @@ export class AutomationService {
             userId: preference.approverUserId,
             order: preference.order,
           }));
+
+        for (const approval of approvals) {
+          const valid = validApprovers.get(`${form.typeId}|${approval.order}`);
+          if (valid && !valid.includes(approval.userId)) {
+            throw new Error(
+              `người duyệt ${approval.order} đã lưu không còn trong danh sách được duyệt`,
+            );
+          }
+        }
 
         if (approvals.length < orderMax) {
           throw new Error(

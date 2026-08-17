@@ -56,6 +56,38 @@ export function daysBetween(from: string, to: string): number {
 }
 
 /**
+ * Số ngày còn được nộp đơn cho một ngày, tính cả chính ngày đó.
+ *
+ * HRM cấu hình `max_days_after` (số ngày SAU ngày áp dụng), nên hạn thực tế là
+ * `max_days_after + 1`. Ví dụ cấu hình 6 → đơn cho ngày 27/07 nộp muộn nhất
+ * ngày 03/08.
+ */
+export function submissionDeadlineDays(
+  rules: TimesheetRules,
+  typeId: number,
+): number {
+  return (
+    (rules.maxDaysAfterByType.get(typeId) ?? rules.defaultMaxDaysAfter) + 1
+  );
+}
+
+/**
+ * Ngày làm việc đã kết thúc chưa — có lần chấm công nào sau giờ tan ca không.
+ *
+ * Dùng để không gợi ý đơn cho ngày HÔM NAY khi người dùng còn đang làm: số phút
+ * về sớm lúc này chỉ là tạm, ở lại thêm là tự hết.
+ */
+export function hasWorkdayEnded(
+  day: CalendarDay,
+  rules: TimesheetRules,
+): boolean {
+  const timeOut = toMinutes(day.timeOut);
+  const workEnd = toMinutes(rules.workEnd);
+  if (timeOut == null || workEnd == null) return false;
+  return timeOut > workEnd;
+}
+
+/**
  * Đếm số lần đã dùng một lý do trong tuần chứa `dateKey`.
  * Tính cả đơn chờ duyệt — chúng vẫn chiếm chỗ.
  */
@@ -179,19 +211,17 @@ export function checkDraftForm(
     }
   }
 
-  // 3. Hạn nộp đơn tính từ ngày áp dụng.
-  const maxDaysAfter = rules.maxDaysAfterByType.get(draft.typeId);
-  if (maxDaysAfter != null) {
-    const elapsed = daysBetween(draft.date, today);
-    const deadline = maxDaysAfter + 1;
-    if (elapsed > deadline) {
-      warnings.push({
-        code: 'submission-deadline',
-        message:
-          `Đã quá ${elapsed} ngày kể từ ${draft.date}, hạn nộp là ${deadline} ngày. ` +
-          `HRM có thể từ chối đơn này.`,
-      });
-    }
+  // 3. Hạn nộp đơn tính từ ngày áp dụng. Chỉ CẢNH BÁO — người dùng tự tạo đơn
+  // thì không chặn, HRM mới là nơi quyết định.
+  const deadline = submissionDeadlineDays(rules, draft.typeId);
+  const elapsed = daysBetween(draft.date, today);
+  if (elapsed > deadline) {
+    warnings.push({
+      code: 'submission-deadline',
+      message:
+        `Đã quá ${elapsed} ngày kể từ ${draft.date}, hạn nộp là ${deadline} ngày. ` +
+        `HRM có thể từ chối đơn này.`,
+    });
   }
 
   // 4. Điều kiện đủ giờ làm.

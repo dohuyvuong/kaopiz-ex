@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Input } from '@/components/ui/input';
 import { AlertTriangle, Loader2, Sparkles, Trash2 } from 'lucide-react';
 import { useAutoCreateApplications } from '@/hooks/use-auto-create-applications';
 import type { CalendarDay, LateEarly, TimesheetRules } from '@kaopiz/timesheet';
@@ -227,8 +228,41 @@ export function AutoCreateApplicationsDialog({
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
-                    <div className="text-sm text-muted-foreground">
-                      {form.timeStart} – {form.timeEnd} ({form.minutes} phút)
+                    {/* Sửa giờ tại chỗ: đề xuất của máy chỉ là điểm khởi đầu,
+                        người dùng biết ngày hôm đó thực tế thế nào. */}
+                    <div className="flex items-center gap-2 text-sm">
+                      <Input
+                        type="time"
+                        aria-label="Giờ bắt đầu"
+                        className="h-8 w-[110px]"
+                        value={form.timeStart}
+                        disabled={auto.isCreating}
+                        onChange={(event) =>
+                          auto.setFormTime(form, {
+                            timeStart: event.target.value,
+                          })
+                        }
+                      />
+                      <span className="text-muted-foreground">–</span>
+                      <Input
+                        type="time"
+                        aria-label="Giờ kết thúc"
+                        className="h-8 w-[110px]"
+                        value={form.timeEnd}
+                        disabled={auto.isCreating}
+                        onChange={(event) =>
+                          auto.setFormTime(form, { timeEnd: event.target.value })
+                        }
+                      />
+                      {form.minutes > 0 ? (
+                        <span className="text-muted-foreground">
+                          {form.minutes} phút
+                        </span>
+                      ) : (
+                        <span className="text-destructive">
+                          Giờ kết thúc phải sau giờ bắt đầu
+                        </span>
+                      )}
                     </div>
                     {failure && (
                       <div className="text-sm text-destructive">
@@ -263,7 +297,9 @@ export function AutoCreateApplicationsDialog({
           </Button>
           <Button
             onClick={() => void handleCreate()}
-            disabled={auto.isCreating || auto.forms.length === 0}
+            disabled={
+              auto.isCreating || auto.forms.length === 0 || auto.hasInvalidTime
+            }
           >
             {auto.isCreating && (
               <Loader2 className="h-4 w-4 animate-spin mr-1" />
