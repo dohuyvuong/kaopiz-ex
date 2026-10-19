@@ -23,7 +23,7 @@ Các bước 1–4 chỉ làm một lần. Những lần deploy sau chỉ cần 
 
 1. Vào [Cloudflare Zero Trust](https://one.dash.cloudflare.com) → **Networks → Tunnels → Create a tunnel** → chọn **Cloudflared** → đặt tên (vd: `kaopiz-ex`).
 2. Ở bước cài connector, **copy lệnh cài** có chứa `--token eyJ...` rồi lưu tạm lại (dán nguyên lệnh vào script cũng được). **Không cần chạy lệnh đó**: container `cloudflared` trong compose sẽ làm việc này.
-3. Thêm 2 route ở tab **Public Hostname** (giao diện mới gọi là *Published application routes*):
+3. **Trỏ domain vào tunnel**: thêm 2 route ở tab **Public Hostname** của tunnel (giao diện mới gọi là *Published application routes*):
 
    | Hostname | Service |
    |----------|---------|
@@ -34,7 +34,19 @@ Các bước 1–4 chỉ làm một lần. Những lần deploy sau chỉ cần 
 
    Service phải là **tên service trong compose** (`frontend`, `backend`), không phải `localhost`. Port lấy theo `FRONTEND_PORT` / `BACKEND_PORT` trong `.env`.
 
-4. Cloudflare tự tạo bản ghi DNS (CNAME) cho hai hostname. Nếu báo *record already exists* (vd: domain đang trỏ A record về server nginx cũ), xoá bản ghi cũ trong **DNS → Records** rồi thêm lại route.
+4. Lưu route xong, **dashboard Cloudflare tự tạo bản ghi DNS** cho từng hostname, không cần vào trang DNS. `deploy.sh` không đụng tới DNS hay route: nó chỉ dùng token để container `cloudflared` nối vào tunnel. Đổi hostname/port sau này thì sửa trên dashboard, không cần deploy lại.
+
+   | Type | Name | Target | Proxy |
+   |------|------|--------|-------|
+   | `CNAME` | `kaopiz-ex` | `<tunnel-id>.cfargotunnel.com` | Proxied (đám mây cam) |
+   | `CNAME` | `kaopiz-ex-api` | `<tunnel-id>.cfargotunnel.com` | Proxied (đám mây cam) |
+
+   Kiểm tra ở **DNS → Records** của domain. `<tunnel-id>` là ID hiện trong danh sách Tunnels.
+
+   - Báo *record already exists*: hostname đó đã có bản ghi khác (vd: A record trỏ về server cũ). Xoá bản ghi cũ trong **DNS → Records** rồi lưu lại route.
+   - Không thấy bản ghi được tạo (vd: domain nằm ở tài khoản Cloudflare khác): tự thêm 2 bản ghi CNAME như bảng trên, **bật Proxied**. Để DNS only thì không chạy, vì `cfargotunnel.com` không có IP public.
+
+   DNS của Cloudflare cập nhật gần như ngay; vào được hostname mà thấy lỗi 1033 nghĩa là DNS đã đúng nhưng tunnel chưa chạy — sẽ hết sau khi deploy ở bước 5.
 
 Domain phụ (domain cũ, `www`…) trước đây được nginx redirect về domain chính. Giờ việc này làm bằng **Rules → Redirect Rules** trên Cloudflare.
 
