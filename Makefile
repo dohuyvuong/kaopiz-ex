@@ -11,8 +11,9 @@ COMPOSE_APP := docker compose --profile app
 COMPOSE_EDGE := docker compose --profile edge
 COMPOSE_STACK := docker compose --profile db --profile app
 COMPOSE_PROD := docker compose --profile db --profile app --profile edge
+COMPOSE_ALL := docker compose --profile db --profile app --profile edge --profile tunnel
 
-.PHONY: build-backend build-frontend build-nginx build up-db up-app up up-prod down logs
+.PHONY: build-backend build-frontend build-nginx build up-db up-app up up-prod deploy-tunnel down logs
 
 # Context là gốc repo (dấu "."), không phải ./backend hay ./frontend: cả hai
 # image đều cần thư mục shared/ — package logic chấm công dùng chung.
@@ -44,8 +45,12 @@ up: build
 up-prod:
 	$(COMPOSE_PROD) up -d
 
+# Production qua Cloudflare Tunnel (không nginx) — xem deploy.sh
+deploy-tunnel:
+	./deploy.sh
+
 down:
-	docker compose --profile db --profile app --profile edge down
+	$(COMPOSE_ALL) down
 
 logs:
-	docker compose --profile db --profile app --profile edge logs -f
+	$(COMPOSE_ALL) logs -f

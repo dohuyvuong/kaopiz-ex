@@ -25,6 +25,11 @@ Xem chi tiết trong [backend/README.md](./backend/README.md)
 
 Frontend được xây dựng với Next.js. Xem [frontend/README.md](./frontend/README.md).
 
+## Deploy
+
+- One-click qua Cloudflare Tunnel (Linux/Windows): [docs/deploy-tunnel.md](./docs/deploy-tunnel.md)
+- Docker Compose và các profile: [docs/docker.md](./docs/docker.md)
+
 ## Development
 
 ### Git hooks (lint trước khi commit)

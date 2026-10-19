@@ -14,7 +14,8 @@ Một file `docker-compose.yml`, bật service theo profile:
 |---------|----------|--------------|
 | `db` | Postgres | Dev local cần DB trong Docker; hoặc prod tự host DB |
 | `app` | backend + frontend | Deploy ứng dụng (luôn đi cùng nhau) |
-| `edge` | nginx + keep-alive | Prod có domain public / SSL |
+| `edge` | nginx + keep-alive | Prod có domain public / SSL, mở port 80/443 |
+| `tunnel` | cloudflared | Prod đi qua Cloudflare Tunnel — thay cho `edge`, không mở port |
 
 **Lưu ý:** Mọi service đều gắn profile — `docker compose up -d` không bật gì cả; phải chỉ rõ profile.
 
@@ -22,7 +23,7 @@ Một file `docker-compose.yml`, bật service theo profile:
 
 Dự án dùng **PostgreSQL** (đã chuyển từ SQLite).
 
-- **Profile `db`:** Postgres 16 Alpine, port `5432`, volume `postgres_data`.
+- **Profile `db`:** Postgres 16 Alpine, publish `127.0.0.1:5432` (đổi bằng `POSTGRES_BIND` / `POSTGRES_PORT`), volume `postgres_data`.
 - **Không dùng profile `db`:** set `DATABASE_URL` trong `.env` trỏ Postgres ngoài (managed DB, Postgres cài trên host, …).
 
 Khi bật profile `db`, backend container mặc định dùng:
@@ -57,7 +58,11 @@ docker compose --profile db --profile app --profile edge up -d
 make up-prod
 ```
 
-Với profile `edge`, truy cập qua domain (`PRIMARY_DOMAIN`) trên port 80/443. Postgres: `localhost:5432` khi bật profile `db`.
+Với profile `edge`, truy cập qua domain (`PRIMARY_DOMAIN`) trên port 80/443. Postgres: `localhost:${POSTGRES_PORT:-5432}` khi bật profile `db`.
+
+## Deploy qua Cloudflare Tunnel (one-click)
+
+Profile `tunnel` thay cho `edge`: không nginx, không mở port 80/443, chạy bằng `./deploy.sh` (Windows: `deploy.cmd`). Hướng dẫn từng bước: [deploy-tunnel.md](./deploy-tunnel.md).
 
 ## Migrations
 

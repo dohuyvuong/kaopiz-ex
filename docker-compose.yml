@@ -1,12 +1,14 @@
 # Profiles:
 #   db   — Postgres trong Docker (tuỳ chọn; có thể dùng DATABASE_URL trỏ DB ngoài)
 #   app  — backend + frontend (luôn đi cùng nhau)
-#   edge — nginx + keep-alive (production / public domain)
+#   edge — nginx + keep-alive (production / public domain, mở port 80/443)
+#   tunnel — cloudflared (thay cho edge khi đi qua Cloudflare Tunnel, xem deploy.sh)
 #
 # Ví dụ:
 #   docker compose --profile db up -d
 #   docker compose --profile db --profile app up -d
 #   docker compose --profile db --profile app --profile edge up -d
+#   docker compose --profile db --profile app --profile tunnel up -d
 
 services:
   db:
@@ -24,8 +26,11 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    # Chỉ để truy cập DB từ host (dev local, công cụ quản trị); app trong
+    # compose gọi db:5432 qua mạng nội bộ. Server đã có Postgres chiếm 5432 thì
+    # đổi POSTGRES_PORT; cần mở ra ngoài thì POSTGRES_BIND=0.0.0.0.
     ports:
-      - "5432:5432"
+      - "${POSTGRES_BIND:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"
 
   backend:
     profiles: ["app"]
@@ -117,6 +122,20 @@ services:
         limits:
           cpus: '0.05'
           memory: 20M
+
+  # Public hostname cấu hình trên dashboard Cloudflare, trỏ thẳng vào service:
+  #   app domain → http://frontend:${FRONTEND_PORT}
+  #   api domain → http://backend:${BACKEND_PORT}
+  cloudflared:
+    profiles: ["tunnel"]
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    depends_on:
+      - frontend
+      - backend
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
 
 volumes:
   postgres_data:
